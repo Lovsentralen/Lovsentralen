@@ -5,6 +5,57 @@ import { getSourcePriority } from "./index";
 const SECTION_PATTERN = /§\s*\d+[a-z]?(?:-\d+)?/gi;
 const CHAPTER_PATTERN = /(?:kapittel|kap\.?)\s*\d+/gi;
 
+// Patterns that indicate a law/regulation is repealed
+const REPEALED_PATTERNS = [
+  /loven\s+er\s+opphevet/i,
+  /forskriften\s+er\s+opphevet/i,
+  /denne\s+(?:loven?|forskriften?)\s+er\s+opphevet/i,
+  /opphevet\s+ved\s+lov/i,
+  /opphevet\s+fra/i,
+  /opphevet\s+\d{1,2}\.\s*(?:januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember)/i,
+  /ikke\s+lenger\s+(?:i\s+kraft|gjeldende)/i,
+  /erstattet\s+av/i,
+  /avløst\s+av/i,
+  /historisk\s+versjon/i,
+  /utgått/i,
+];
+
+/**
+ * Check if a page indicates a repealed law/regulation
+ */
+function checkIfRepealed(
+  $: cheerio.CheerioAPI,
+  content: string
+): { isRepealed: boolean; reason?: string } {
+  // Check meta tags and special elements first (common on Lovdata)
+  const metaDescription = $('meta[name="description"]').attr("content") || "";
+  const alertBoxes = $(".alert, .warning, .notice, .info-box").text();
+  const headerInfo = $("header, .header-info, .law-status").text();
+  
+  const textToCheck = `${metaDescription} ${alertBoxes} ${headerInfo} ${content.slice(0, 3000)}`.toLowerCase();
+  
+  for (const pattern of REPEALED_PATTERNS) {
+    const match = textToCheck.match(pattern);
+    if (match) {
+      return {
+        isRepealed: true,
+        reason: `Kilden er opphevet: "${match[0]}"`,
+      };
+    }
+  }
+  
+  // Check title for repealed indicators
+  const title = $("title").text().toLowerCase();
+  if (title.includes("opphevet") || title.includes("historisk")) {
+    return {
+      isRepealed: true,
+      reason: "Kilden er markert som opphevet i tittelen",
+    };
+  }
+  
+  return { isRepealed: false };
+}
+
 export async function fetchAndParsePage(
   url: string,
 ): Promise<ParsedPage | null> {
@@ -36,6 +87,9 @@ export async function fetchAndParsePage(
 export function parsePage(url: string, html: string): ParsedPage {
   const $ = cheerio.load(html);
 
+  // Check if repealed BEFORE removing elements (to catch warning boxes)
+  const repealedCheck = checkIfRepealed($, $.text());
+
   // Remove unwanted elements
   $(
     "script, style, nav, header, footer, aside, .menu, .sidebar, .navigation, .advertisement, .cookie-notice",
@@ -59,6 +113,8 @@ export function parsePage(url: string, html: string): ParsedPage {
     content: mainContent,
     sections,
     source_priority: getSourcePriority(url),
+    isRepealed: repealedCheck.isRepealed,
+    repealedReason: repealedCheck.reason,
   };
 }
 
@@ -150,8 +206,10 @@ function extractSections(
 
 export async function fetchMultiplePages(
   urls: string[],
+  filterRepealed = true,
 ): Promise<ParsedPage[]> {
   const pages: ParsedPage[] = [];
+  const repealedPages: ParsedPage[] = [];
 
   // Fetch pages in parallel with concurrency limit
   const concurrencyLimit = 5;
@@ -168,9 +226,21 @@ export async function fetchMultiplePages(
 
     for (const page of results) {
       if (page) {
-        pages.push(page);
+        if (page.isRepealed && filterRepealed) {
+          repealedPages.push(page);
+          console.log(`⚠️ Opphevet kilde filtrert ut: ${page.title} (${page.url})`);
+          console.log(`   Årsak: ${page.repealedReason}`);
+        } else {
+          pages.push(page);
+        }
       }
     }
+  }
+
+  // Log summary if any repealed pages were filtered
+  if (repealedPages.length > 0) {
+    console.log(`\n📋 Filtrerte ut ${repealedPages.length} opphevede kilder:`);
+    repealedPages.forEach((p) => console.log(`   - ${p.title}`));
   }
 
   return pages;
@@ -188,7 +258,20 @@ export function extractRelevantExcerpts(
   }[] = [];
   const issueKeywords = issue.toLowerCase().split(/\s+/);
 
-  for (const page of pages) {
+  // Filter out any repealed pages that might have slipped through
+  const validPages = pages.filter((page) => {
+    if (page.isRepealed) {
+      console.log(`⚠️ Hopper over opphevet kilde i extractRelevantExcerpts: ${page.title}`);
+      return false;
+    }
+    return true;
+  });
+
+  if (validPages.length === 0 && pages.length > 0) {
+    console.warn("⚠️ Alle kilder er opphevet! Prøver å finne nyere kilder...");
+  }
+
+  for (const page of validPages) {
     // Check sections first
     for (const section of page.sections) {
       const sectionLower = section.content.toLowerCase();

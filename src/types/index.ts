@@ -127,6 +127,8 @@ export interface ParsedPage {
   content: string;
   sections: PageSection[];
   source_priority: SourcePriority;
+  isRepealed: boolean;
+  repealedReason?: string;
 }
 
 export interface PageSection {
