@@ -186,77 +186,80 @@ export function ResultsDisplay({
               <div className="ml-11 space-y-4">
                 <p className="text-slate-700 leading-relaxed">{qa.answer}</p>
 
-                {expandedQA === qa.id && (
-                  <div className="space-y-4 pt-4 border-t border-slate-100">
-                    {/* Citations */}
-                    {qa.citations.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-slate-900 mb-2">
-                          📎 Kilder
-                        </h4>
-                        <div className="space-y-2">
-                          {qa.citations.map((citation, cidx) => (
-                            <a
-                              key={cidx}
-                              href={citation.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-sm text-amber-700 hover:text-amber-800 hover:underline"
-                            >
-                              <span>→</span>
-                              <span>
-                                {citation.source_name}
-                                {citation.section && ` ${citation.section}`}
-                              </span>
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Assumptions */}
-                    {qa.assumptions.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-slate-900 mb-2">
-                          💭 Forutsetninger
-                        </h4>
-                        <ul className="text-sm text-slate-600 space-y-1">
-                          {qa.assumptions.map((assumption, aidx) => (
-                            <li key={aidx} className="flex items-start gap-2">
-                              <span className="text-slate-400">•</span>
-                              {assumption}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Missing facts */}
-                    {qa.missing_facts.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-slate-900 mb-2">
-                          ❓ Manglende informasjon
-                        </h4>
-                        <ul className="text-sm text-slate-600 space-y-1">
-                          {qa.missing_facts.map((fact, fidx) => (
-                            <li key={fidx} className="flex items-start gap-2">
-                              <span className="text-slate-400">•</span>
-                              {fact}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                {/* Citations - Always visible at bottom */}
+                {qa.citations.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="flex flex-wrap gap-2">
+                      {qa.citations.map((citation, cidx) => (
+                        <a
+                          key={cidx}
+                          href={citation.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 hover:bg-amber-100 hover:text-amber-800 transition-colors"
+                        >
+                          <span>📎</span>
+                          <span>
+                            {citation.source_name}
+                            {citation.section && ` ${citation.section}`}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {!expandedQA && (
-                  <button
-                    onClick={() => setExpandedQA(qa.id)}
-                    className="text-sm text-amber-600 hover:text-amber-700 font-medium"
-                  >
-                    Vis mer →
-                  </button>
+                {/* Expandable section for assumptions and missing facts */}
+                {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
+                  <>
+                    {expandedQA === qa.id && (
+                      <div className="space-y-4 pt-3 border-t border-slate-100">
+                        {/* Assumptions */}
+                        {qa.assumptions.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-900 mb-2">
+                              💭 Forutsetninger
+                            </h4>
+                            <ul className="text-sm text-slate-600 space-y-1">
+                              {qa.assumptions.map((assumption, aidx) => (
+                                <li key={aidx} className="flex items-start gap-2">
+                                  <span className="text-slate-400">•</span>
+                                  {assumption}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Missing facts */}
+                        {qa.missing_facts.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-900 mb-2">
+                              ❓ Manglende informasjon
+                            </h4>
+                            <ul className="text-sm text-slate-600 space-y-1">
+                              {qa.missing_facts.map((fact, fidx) => (
+                                <li key={fidx} className="flex items-start gap-2">
+                                  <span className="text-slate-400">•</span>
+                                  {fact}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {expandedQA !== qa.id && (
+                      <button
+                        onClick={() => setExpandedQA(qa.id)}
+                        className="text-sm text-amber-600 hover:text-amber-700 font-medium"
+                      >
+                        Vis forutsetninger →
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </CardContent>
@@ -327,72 +330,77 @@ export function ResultsDisplay({
                       <div className="ml-11 space-y-4">
                         <p className="text-slate-600 leading-relaxed">{qa.answer}</p>
 
-                        {expandedQA === qa.id && (
-                          <div className="space-y-4 pt-4 border-t border-slate-100">
-                            {qa.citations.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-slate-900 mb-2">
-                                  📎 Kilder
-                                </h4>
-                                <div className="space-y-2">
-                                  {qa.citations.map((citation, cidx) => (
-                                    <a
-                                      key={cidx}
-                                      href={citation.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-2 text-sm text-amber-700 hover:text-amber-800 hover:underline"
-                                    >
-                                      <span>→</span>
-                                      <span>
-                                        {citation.source_name}
-                                        {citation.section && ` ${citation.section}`}
-                                      </span>
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {qa.assumptions.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-slate-900 mb-2">
-                                  💭 Forutsetninger
-                                </h4>
-                                <ul className="text-sm text-slate-600 space-y-1">
-                                  {qa.assumptions.map((assumption, aidx) => (
-                                    <li key={aidx} className="flex items-start gap-2">
-                                      <span className="text-slate-400">•</span>
-                                      {assumption}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {qa.missing_facts.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-slate-900 mb-2">
-                                  ❓ Manglende informasjon
-                                </h4>
-                                <ul className="text-sm text-slate-600 space-y-1">
-                                  {qa.missing_facts.map((fact, fidx) => (
-                                    <li key={fidx} className="flex items-start gap-2">
-                                      <span className="text-slate-400">•</span>
-                                      {fact}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
+                        {/* Citations - Always visible at bottom */}
+                        {qa.citations.length > 0 && (
+                          <div className="pt-3 border-t border-slate-100">
+                            <div className="flex flex-wrap gap-2">
+                              {qa.citations.map((citation, cidx) => (
+                                <a
+                                  key={cidx}
+                                  href={citation.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors"
+                                >
+                                  <span>📎</span>
+                                  <span>
+                                    {citation.source_name}
+                                    {citation.section && ` ${citation.section}`}
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         )}
 
-                        {expandedQA !== qa.id && (
-                          <button
-                            onClick={() => setExpandedQA(qa.id)}
-                            className="text-sm text-slate-500 hover:text-slate-700 font-medium"
-                          >
-                            Vis mer →
-                          </button>
+                        {/* Expandable section for assumptions and missing facts */}
+                        {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
+                          <>
+                            {expandedQA === qa.id && (
+                              <div className="space-y-4 pt-3 border-t border-slate-100">
+                                {qa.assumptions.length > 0 && (
+                                  <div>
+                                    <h4 className="text-sm font-medium text-slate-900 mb-2">
+                                      💭 Forutsetninger
+                                    </h4>
+                                    <ul className="text-sm text-slate-600 space-y-1">
+                                      {qa.assumptions.map((assumption, aidx) => (
+                                        <li key={aidx} className="flex items-start gap-2">
+                                          <span className="text-slate-400">•</span>
+                                          {assumption}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {qa.missing_facts.length > 0 && (
+                                  <div>
+                                    <h4 className="text-sm font-medium text-slate-900 mb-2">
+                                      ❓ Manglende informasjon
+                                    </h4>
+                                    <ul className="text-sm text-slate-600 space-y-1">
+                                      {qa.missing_facts.map((fact, fidx) => (
+                                        <li key={fidx} className="flex items-start gap-2">
+                                          <span className="text-slate-400">•</span>
+                                          {fact}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {expandedQA !== qa.id && (
+                              <button
+                                onClick={() => setExpandedQA(qa.id)}
+                                className="text-sm text-slate-500 hover:text-slate-700 font-medium"
+                              >
+                                Vis forutsetninger →
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </CardContent>
