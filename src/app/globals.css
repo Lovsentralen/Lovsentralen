@@ -47,6 +47,20 @@ html {
 /* Loading animation */
 @keyframes shimmer {
   0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Skeleton loading shimmer */
+@keyframes skeleton-shimmer {
+  0% {
     background-position: -200% 0;
   }
   100% {
@@ -54,8 +68,21 @@ html {
   }
 }
 
-.animate-shimmer {
+.skeleton-shimmer {
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+/* Progress bar animation */
+@keyframes progress {
+  0% {
+    width: 20%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 95%;
+  }
 }

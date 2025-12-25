@@ -42,6 +42,18 @@ export default async function DashboardLayout({
               >
                 Mine saker
               </Link>
+              <Link
+                href="/pricing"
+                className="text-slate-600 hover:text-amber-600 transition-colors font-medium"
+              >
+                Priser
+              </Link>
+              <Link
+                href="/profile"
+                className="text-slate-600 hover:text-amber-600 transition-colors font-medium"
+              >
+                Min profil
+              </Link>
               <form action="/api/auth/signout" method="POST">
                 <button
                   type="submit"

@@ -102,41 +102,36 @@ export default async function HistoryPage() {
               variant="elevated"
               className="hover:shadow-lg transition-shadow"
             >
-              <Link href={getLinkForCase(caseItem)}>
-                <CardContent className="py-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusLabels[caseItem.status]?.color || "bg-slate-100 text-slate-700"}`}
-                        >
-                          {statusLabels[caseItem.status]?.label ||
-                            caseItem.status}
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <Link href={getLinkForCase(caseItem)} className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusLabels[caseItem.status]?.color || "bg-slate-100 text-slate-700"}`}
+                      >
+                        {statusLabels[caseItem.status]?.label ||
+                          caseItem.status}
+                      </span>
+                      {caseItem.category && (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                          {CATEGORY_LABELS[
+                            caseItem.category as keyof typeof CATEGORY_LABELS
+                          ] || caseItem.category}
                         </span>
-                        {caseItem.category && (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                            {CATEGORY_LABELS[
-                              caseItem.category as keyof typeof CATEGORY_LABELS
-                            ] || caseItem.category}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-slate-900 font-medium line-clamp-2 mb-2">
-                        {caseItem.faktum_text}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        {formatDate(caseItem.created_at)}
-                      </p>
+                      )}
                     </div>
-                    <div
-                      className="flex items-center gap-2"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <DeleteCaseButton caseId={caseItem.id} />
-                    </div>
+                    <p className="text-slate-900 font-medium line-clamp-2 mb-2">
+                      {caseItem.faktum_text}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {formatDate(caseItem.created_at)}
+                    </p>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <DeleteCaseButton caseId={caseItem.id} />
                   </div>
-                </CardContent>
-              </Link>
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>

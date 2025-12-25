@@ -9,6 +9,7 @@ import {
   CardContent,
   CardHeader,
   CardFooter,
+  AnalysisProgress,
 } from "@/components/ui";
 import type { Clarification } from "@/types";
 
@@ -80,8 +81,12 @@ export function ClarificationForm({
   ).length;
 
   return (
-    <div className="space-y-6">
-      {/* Summary of faktum */}
+    <>
+      {/* Analysis Progress Overlay */}
+      <AnalysisProgress isActive={loading} />
+      
+      <div className="space-y-6">
+        {/* Summary of faktum */}
       <Card variant="bordered">
         <CardHeader>
           <h2 className="text-lg font-semibold text-slate-900">
@@ -183,6 +188,7 @@ export function ClarificationForm({
           </CardFooter>
         </form>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }

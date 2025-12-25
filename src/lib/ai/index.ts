@@ -36,6 +36,39 @@ VIKTIGE REGLER:
 DISCLAIMER som må inkluderes:
 "Dette er kun generell informasjon og ikke juridisk rådgivning. For konkrete juridiske spørsmål, kontakt en advokat."`;
 
+export async function quickExtractLegalDomain(
+  faktum: string,
+  category: string | null,
+): Promise<{ domain: string; searchTerms: string[] }> {
+  const openai = getOpenAI();
+  
+  const prompt = `Analyser følgende faktum kort for å identifisere rettsområdet og relevante søkeord.
+
+FAKTUM:
+${faktum}
+
+KATEGORI: ${category || "Ikke spesifisert"}
+
+Returner JSON:
+{
+  "domain": "Hovedrettsområdet (f.eks. Forbrukerkjøp, Husleie, Arbeidsrett)",
+  "searchTerms": ["3-4 spesifikke juridiske søkeord for å finne relevant lovverk"]
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.3,
+    response_format: { type: "json_object" },
+  });
+
+  const content = response.choices[0]?.message?.content || '{"domain": "Generelt", "searchTerms": []}';
+  return JSON.parse(content);
+}
+
 export async function extractLegalIssues(
   faktum: string,
   clarifications: { question: string; answer: string }[],
@@ -78,26 +111,36 @@ Identifiser 2-5 hovedproblemstillinger.`;
 export async function generateClarifyingQuestions(
   faktum: string,
   category: string | null,
+  legalContext?: string,
 ): Promise<string[]> {
   const openai = getOpenAI();
+  
+  const contextSection = legalContext 
+    ? `\nJURIDISK KONTEKST FRA SØKERESULTATER:\n${legalContext}\n\nBruk denne konteksten til å stille spørsmål som er spesifikt relevante for de juridiske reglene som gjelder.`
+    : "";
+
   const prompt = `Du skal generere oppklarende spørsmål for å bedre forstå brukerens juridiske situasjon.
 
 FAKTUM:
 ${faktum}
 
 KATEGORI: ${category || "Ikke spesifisert"}
+${contextSection}
 
-Generer 3-7 konkrete oppklarende spørsmål som vil hjelpe med å:
-1. Forstå tidslinjen (når skjedde ting)
-2. Identifisere partene (hvem er involvert)
-3. Avklare dokumentasjon (hva finnes av bevis)
-4. Forstå kommunikasjon (hva er sagt/skrevet)
-5. Avklare økonomiske forhold (beløp, kostnader)
+Generer nøyaktig 3 konkrete oppklarende spørsmål som vil hjelpe med å avgjøre brukerens rettigheter og plikter.
 
-Spørsmålene skal være enkle og konkrete, ikke juridisk-tekniske.
+${legalContext ? `Basert på den juridiske konteksten, fokuser på fakta som er AVGJØRENDE for å anvende de relevante reglene. For eksempel:
+- Hvis det er snakk om reklamasjon: spør om tidspunkt for kjøp og oppdagelse av mangel
+- Hvis det er snakk om oppsigelse: spør om ansettelsestid og om det var skriftlig
+- Hvis det er snakk om husleie: spør om type leieforhold og kontraktsvilkår` : `Fokuser på:
+- Tidslinje (når skjedde ting)
+- Parter (hvem er involvert)
+- Dokumentasjon (hva finnes av bevis)`}
+
+Spørsmålene skal være enkle og konkrete, ikke juridisk-tekniske. Unngå generiske spørsmål - still spørsmål som faktisk vil påvirke det juridiske utfallet.
 
 Returner som JSON:
-{ "questions": ["Spørsmål 1", "Spørsmål 2", ...] }`;
+{ "questions": ["Spørsmål 1", "Spørsmål 2", "Spørsmål 3"] }`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -111,7 +154,8 @@ Returner som JSON:
 
   const content = response.choices[0]?.message?.content || '{"questions": []}';
   const parsed = JSON.parse(content);
-  return parsed.questions;
+  // Ensure maximum of 3 questions
+  return (parsed.questions || []).slice(0, 3);
 }
 
 export async function generateLegalAnalysis(

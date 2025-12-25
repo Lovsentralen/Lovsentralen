@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { generateClarifyingQuestions, detectSensitiveTopics } from "@/lib/ai";
+import { generateClarifyingQuestions, detectSensitiveTopics, quickExtractLegalDomain } from "@/lib/ai";
+import { searchGoogle } from "@/lib/google-search";
+import { fetchAndParsePage } from "@/lib/google-search/parser";
 import type { LegalCategory } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -50,8 +52,44 @@ export async function POST(request: NextRequest) {
     // Check for sensitive topics
     const sensitivityCheck = await detectSensitiveTopics(faktum_text);
 
-    // Generate clarifying questions
-    const questions = await generateClarifyingQuestions(faktum_text, category);
+    // Step 1: Quick extract legal domain and search terms
+    const { domain, searchTerms } = await quickExtractLegalDomain(faktum_text, category);
+    
+    // Step 2: Do a preliminary search to get legal context
+    let legalContext = "";
+    try {
+      // Search for the most relevant legal source
+      const searchQuery = `${searchTerms.slice(0, 2).join(" ")} ${domain} lovdata norsk lov`;
+      const searchResults = await searchGoogle(searchQuery, 5);
+      
+      // Fetch the top 2 results to get context
+      const topUrls = searchResults.slice(0, 2).map(r => r.url);
+      const pageContents: string[] = [];
+      
+      for (const url of topUrls) {
+        const page = await fetchAndParsePage(url);
+        if (page) {
+          // Extract key sections mentioning relevant terms
+          const relevantContent = page.sections
+            .filter(s => s.section_number || s.content.length > 100)
+            .slice(0, 3)
+            .map(s => `${s.section_number ? `${s.section_number}: ` : ""}${s.content.slice(0, 500)}`)
+            .join("\n");
+          
+          if (relevantContent) {
+            pageContents.push(`[${page.title}]\n${relevantContent}`);
+          }
+        }
+      }
+      
+      legalContext = pageContents.join("\n\n---\n\n");
+    } catch (error) {
+      console.error("Error in preliminary search:", error);
+      // Continue without context if search fails
+    }
+
+    // Generate clarifying questions WITH legal context
+    const questions = await generateClarifyingQuestions(faktum_text, category, legalContext || undefined);
 
     // Save clarifications
     const clarificationInserts = questions.map((question, index) => ({
