@@ -75,6 +75,7 @@ export interface QAItem {
   confidence: ConfidenceLevel;
   assumptions: string[];
   missing_facts: string[];
+  relevance: number; // 1-10 score for how relevant this Q&A is to the user's specific case
 }
 
 export interface Citation {

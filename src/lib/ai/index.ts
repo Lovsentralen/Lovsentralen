@@ -298,6 +298,19 @@ Du skal returnere en JSON-struktur med følgende:
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
+   - "relevance": Et tall fra 1-10 som angir hvor relevant dette spørsmålet er for DENNE SPESIFIKKE brukerens situasjon:
+     * 10 = Helt avgjørende for brukerens sak, direkte knyttet til hovedproblemet
+     * 8-9 = Svært relevant, viktig for å forstå brukerens rettsstilling
+     * 7 = Relevant og nyttig for brukeren å vite
+     * 5-6 = Noe relevant, men mer generell informasjon
+     * 1-4 = Lite relevant for denne spesifikke saken, bakgrunnsinformasjon
+   
+   VIKTIG FOR RELEVANS-SCORING:
+   - Spørsmål som direkte besvarer "hva kan jeg gjøre nå?" = 9-10
+   - Spørsmål om frister, reklamasjon, og konkrete rettigheter = 8-9
+   - Spørsmål om vilkår som må være oppfylt = 7-8
+   - Generelle juridiske forklaringer = 5-6
+   - Bakgrunnsinformasjon og teoretiske spørsmål = 1-4
 
 2. "checklist": 5-8 konkrete handlinger brukeren bør gjøre, med:
    - "id": unik ID
@@ -320,7 +333,8 @@ VIKTIG:
 - Hver påstand SKAL referere til evidensen
 - Hvis noe ikke kan bekreftes av evidensen, si det eksplisitt
 - Konfidensen skal reflektere hvor godt evidensen støtter svaret
-- Svarene skal være på norsk, i et enkelt språk`;
+- Svarene skal være på norsk, i et enkelt språk
+- Sorter qa_items etter relevance (høyest først)`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",

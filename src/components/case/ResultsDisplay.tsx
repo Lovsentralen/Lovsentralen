@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader } from "@/components/ui";
 import type {
@@ -25,9 +25,19 @@ export function ResultsDisplay({
   evidence,
 }: ResultsDisplayProps) {
   const [expandedQA, setExpandedQA] = useState<string | null>(null);
+  const [showLessRelevant, setShowLessRelevant] = useState(false);
   const [checklist, setChecklist] = useState<ChecklistItem[]>(
     result.checklist_json,
   );
+
+  // Split Q&A items into high relevance (7+) and lower relevance
+  const { highRelevanceQA, lowRelevanceQA } = useMemo(() => {
+    const sorted = [...result.qa_json].sort((a, b) => (b.relevance || 5) - (a.relevance || 5));
+    return {
+      highRelevanceQA: sorted.filter((qa) => (qa.relevance || 5) >= 7),
+      lowRelevanceQA: sorted.filter((qa) => (qa.relevance || 5) < 7),
+    };
+  }, [result.qa_json]);
 
   const toggleChecklist = (id: string) => {
     setChecklist((prev) =>
@@ -127,11 +137,17 @@ export function ResultsDisplay({
 
       {/* Q&A Section */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-slate-900">
-          ❓ Spørsmål og svar
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-slate-900">
+            ❓ Spørsmål og svar
+          </h2>
+          <span className="text-sm text-slate-500">
+            {highRelevanceQA.length} mest relevante av {result.qa_json.length}
+          </span>
+        </div>
 
-        {result.qa_json.map((qa: QAItem, index: number) => (
+        {/* High relevance Q&A (7+) */}
+        {highRelevanceQA.map((qa: QAItem, index: number) => (
           <Card
             key={qa.id}
             variant="elevated"
@@ -152,11 +168,16 @@ export function ResultsDisplay({
                       {qa.question}
                     </h3>
                   </div>
-                  <span
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${confidenceColors[qa.confidence]}`}
-                  >
-                    {qa.confidence} sikkerhet
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      {qa.relevance || 5}/10
+                    </span>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${confidenceColors[qa.confidence]}`}
+                    >
+                      {qa.confidence}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
             </div>
@@ -241,6 +262,146 @@ export function ResultsDisplay({
             </CardContent>
           </Card>
         ))}
+
+        {/* Less relevant Q&A toggle */}
+        {lowRelevanceQA.length > 0 && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowLessRelevant(!showLessRelevant)}
+              className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl border-2 border-dashed border-slate-300 text-slate-600 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50/50 transition-all"
+            >
+              <span className="font-medium">
+                {showLessRelevant ? "Skjul" : "Se"} {lowRelevanceQA.length} mindre relevante spørsmål
+              </span>
+              <svg
+                className={`w-5 h-5 transition-transform ${showLessRelevant ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showLessRelevant && (
+              <div className="mt-4 space-y-4">
+                <p className="text-sm text-slate-500 text-center">
+                  Disse spørsmålene er mindre spesifikke for din sak, men kan inneholde nyttig bakgrunnsinformasjon.
+                </p>
+                {lowRelevanceQA.map((qa: QAItem, index: number) => (
+                  <Card
+                    key={qa.id}
+                    variant="bordered"
+                    className={`cursor-pointer transition-all opacity-80 hover:opacity-100 ${
+                      expandedQA === qa.id ? "ring-2 ring-slate-300" : ""
+                    }`}
+                  >
+                    <div
+                      onClick={() => setExpandedQA(expandedQA === qa.id ? null : qa.id)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-semibold text-sm">
+                              {highRelevanceQA.length + index + 1}
+                            </span>
+                            <h3 className="font-medium text-slate-700 pt-1">
+                              {qa.question}
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                              {qa.relevance || 5}/10
+                            </span>
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium ${confidenceColors[qa.confidence]}`}
+                            >
+                              {qa.confidence}
+                            </span>
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </div>
+
+                    <CardContent className="pt-0">
+                      <div className="ml-11 space-y-4">
+                        <p className="text-slate-600 leading-relaxed">{qa.answer}</p>
+
+                        {expandedQA === qa.id && (
+                          <div className="space-y-4 pt-4 border-t border-slate-100">
+                            {qa.citations.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-900 mb-2">
+                                  📎 Kilder
+                                </h4>
+                                <div className="space-y-2">
+                                  {qa.citations.map((citation, cidx) => (
+                                    <a
+                                      key={cidx}
+                                      href={citation.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-2 text-sm text-amber-700 hover:text-amber-800 hover:underline"
+                                    >
+                                      <span>→</span>
+                                      <span>
+                                        {citation.source_name}
+                                        {citation.section && ` ${citation.section}`}
+                                      </span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {qa.assumptions.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-900 mb-2">
+                                  💭 Forutsetninger
+                                </h4>
+                                <ul className="text-sm text-slate-600 space-y-1">
+                                  {qa.assumptions.map((assumption, aidx) => (
+                                    <li key={aidx} className="flex items-start gap-2">
+                                      <span className="text-slate-400">•</span>
+                                      {assumption}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {qa.missing_facts.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-900 mb-2">
+                                  ❓ Manglende informasjon
+                                </h4>
+                                <ul className="text-sm text-slate-600 space-y-1">
+                                  {qa.missing_facts.map((fact, fidx) => (
+                                    <li key={fidx} className="flex items-start gap-2">
+                                      <span className="text-slate-400">•</span>
+                                      {fact}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {expandedQA !== qa.id && (
+                          <button
+                            onClick={() => setExpandedQA(qa.id)}
+                            className="text-sm text-slate-500 hover:text-slate-700 font-medium"
+                          >
+                            Vis mer →
+                          </button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Action Checklist */}
