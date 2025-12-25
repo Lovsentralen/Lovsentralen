@@ -96,7 +96,7 @@ export default async function HistoryPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {cases.map((caseItem) => (
+          {cases.map((caseItem: Case) => (
             <Card
               key={caseItem.id}
               variant="elevated"

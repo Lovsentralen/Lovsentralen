@@ -47,9 +47,14 @@ export async function POST(
       .eq("case_id", id)
       .order("order_index");
 
-    const clarificationPairs = (clarifications || [])
-      .filter((c) => c.user_answer)
-      .map((c) => ({ question: c.question, answer: c.user_answer! }));
+    interface ClarificationRow {
+      question: string;
+      user_answer: string | null;
+    }
+
+    const clarificationPairs = (clarifications as ClarificationRow[] || [])
+      .filter((c: ClarificationRow) => c.user_answer)
+      .map((c: ClarificationRow) => ({ question: c.question, answer: c.user_answer! }));
 
     // Step 1: Extract legal issues
     const legalIssues = await extractLegalIssues(
