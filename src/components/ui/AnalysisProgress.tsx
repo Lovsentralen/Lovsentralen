@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface AnalysisProgressProps {
   isActive: boolean;
@@ -16,18 +16,23 @@ const ANALYSIS_STEPS = [
 
 export function AnalysisProgress({ isActive }: AnalysisProgressProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [stepProgress, setStepProgress] = useState(0);
 
+  // Reset state when becoming inactive
   useEffect(() => {
     if (!isActive) {
-      setCurrentStep(0);
-      setProgress(0);
-      setStepProgress(0);
-      return;
+      // Use a microtask to avoid synchronous setState in effect body
+      queueMicrotask(() => {
+        setCurrentStep(0);
+        setStepProgress(0);
+      });
     }
+  }, [isActive]);
 
-    // Progress within current step
+  // Progress within current step
+  useEffect(() => {
+    if (!isActive) return;
+
     const stepInterval = setInterval(() => {
       setStepProgress((prev) => {
         if (prev >= 100) return 100;
@@ -38,10 +43,10 @@ export function AnalysisProgress({ isActive }: AnalysisProgressProps) {
     return () => clearInterval(stepInterval);
   }, [isActive, currentStep]);
 
+  // Move to next step when current step is complete
   useEffect(() => {
     if (!isActive) return;
 
-    // Move to next step when current step is complete
     if (stepProgress >= 100 && currentStep < ANALYSIS_STEPS.length - 1) {
       const timeout = setTimeout(() => {
         setCurrentStep((prev) => prev + 1);
@@ -51,12 +56,12 @@ export function AnalysisProgress({ isActive }: AnalysisProgressProps) {
     }
   }, [stepProgress, currentStep, isActive]);
 
-  useEffect(() => {
-    // Calculate overall progress
+  // Calculate overall progress with useMemo instead of useEffect + setState
+  const progress = useMemo(() => {
     const completedSteps = currentStep;
     const stepWeight = 100 / ANALYSIS_STEPS.length;
     const overallProgress = (completedSteps * stepWeight) + (stepProgress / ANALYSIS_STEPS.length);
-    setProgress(Math.min(overallProgress, 95)); // Cap at 95% until actually complete
+    return Math.min(overallProgress, 95); // Cap at 95% until actually complete
   }, [currentStep, stepProgress]);
 
   if (!isActive) return null;
@@ -111,7 +116,6 @@ export function AnalysisProgress({ isActive }: AnalysisProgressProps) {
           {ANALYSIS_STEPS.map((step, index) => {
             const isComplete = index < currentStep;
             const isCurrent = index === currentStep;
-            const isPending = index > currentStep;
 
             return (
               <div
@@ -188,4 +192,3 @@ export function AnalysisProgress({ isActive }: AnalysisProgressProps) {
     </div>
   );
 }
-

@@ -51,15 +51,16 @@ export async function POST(request: NextRequest) {
         if (userId && subscriptionId) {
           const stripe = getStripe();
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const item = subscription.items.data[0];
 
           await supabase.from("subscriptions").upsert({
             user_id: userId,
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: subscriptionId,
             status: subscription.status,
-            price_id: subscription.items.data[0]?.price.id,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            price_id: item?.price.id,
+            current_period_start: item ? new Date(item.current_period_start * 1000).toISOString() : null,
+            current_period_end: item ? new Date(item.current_period_end * 1000).toISOString() : null,
             cancel_at_period_end: subscription.cancel_at_period_end,
           });
         }
@@ -69,15 +70,16 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata?.user_id;
+        const item = subscription.items.data[0];
 
         if (userId) {
           await supabase
             .from("subscriptions")
             .update({
               status: subscription.status,
-              price_id: subscription.items.data[0]?.price.id,
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              price_id: item?.price.id,
+              current_period_start: item ? new Date(item.current_period_start * 1000).toISOString() : null,
+              current_period_end: item ? new Date(item.current_period_end * 1000).toISOString() : null,
               cancel_at_period_end: subscription.cancel_at_period_end,
             })
             .eq("user_id", userId);
@@ -103,7 +105,10 @@ export async function POST(request: NextRequest) {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const subscriptionDetails = invoice.parent?.subscription_details;
+        const subscriptionId = typeof subscriptionDetails?.subscription === 'string' 
+          ? subscriptionDetails.subscription 
+          : subscriptionDetails?.subscription?.id;
 
         if (subscriptionId) {
           await supabase
@@ -116,18 +121,22 @@ export async function POST(request: NextRequest) {
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const subscriptionDetails = invoice.parent?.subscription_details;
+        const subscriptionId = typeof subscriptionDetails?.subscription === 'string' 
+          ? subscriptionDetails.subscription 
+          : subscriptionDetails?.subscription?.id;
 
         if (subscriptionId) {
           const stripe = getStripe();
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const item = subscription.items.data[0];
 
           await supabase
             .from("subscriptions")
             .update({
               status: "active",
-              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              current_period_start: item ? new Date(item.current_period_start * 1000).toISOString() : null,
+              current_period_end: item ? new Date(item.current_period_end * 1000).toISOString() : null,
             })
             .eq("stripe_subscription_id", subscriptionId);
         }

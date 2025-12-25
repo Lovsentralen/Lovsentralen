@@ -19,7 +19,7 @@ export async function createClient() {
         update: () => ({ eq: async () => ({ data: null, error: null }) }),
         delete: () => ({ eq: async () => ({ data: null, error: null }) }),
       }),
-    } as any;
+    } as unknown as ReturnType<typeof createServerClient>;
   }
 
   const cookieStore = await cookies();
