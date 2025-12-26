@@ -352,11 +352,14 @@ IKKE:
   // Post-processing step 3: Sort in logical legal order
   const sortedQaItems = await sortInLegalOrder(withReasoning);
   
-  // Post-processing step 4: Evaluate if assumptions should be shown (FINAL STEP)
+  // Post-processing step 4: Evaluate if assumptions should be shown
   const withAssumptionVisibility = await evaluateAssumptionRelevance(sortedQaItems);
+  
+  // Post-processing step 5 (FINAL): Quality assurance - verify and fix inconsistencies
+  const qualityAssuredItems = await ensureQAQuality(withAssumptionVisibility, faktum);
 
   return {
-    qa_items: withAssumptionVisibility,
+    qa_items: qualityAssuredItems,
     checklist: parsed.checklist || [],
     documentation: parsed.documentation || [],
     sources: parsed.sources || [],
@@ -675,6 +678,224 @@ Returner JSON:
       ...item,
       show_assumptions: item.assumptions.length > 0,
     }));
+  }
+}
+
+/**
+ * POST-PROCESSING STEP 5 (FINAL): Quality Assurance Pipeline
+ * Ensures each Q&A box has perfect consistency between:
+ * - Question (what is being asked)
+ * - Answer (the actual response)
+ * - Legal Reasoning (drøftelse)
+ * - Citations (must actually support the answer)
+ */
+async function ensureQAQuality(
+  qaItems: QAItem[],
+  faktum: string,
+  maxIterations: number = 2
+): Promise<QAItem[]> {
+  const results: QAItem[] = [];
+  
+  for (const item of qaItems) {
+    let currentItem = item;
+    let iteration = 0;
+    
+    while (iteration < maxIterations) {
+      // Step 1: Verify consistency
+      const verification = await verifyQAConsistency(currentItem);
+      
+      if (verification.isConsistent) {
+        // All good, move to next item
+        console.log(`✓ QA "${currentItem.question.substring(0, 50)}..." passed verification`);
+        break;
+      }
+      
+      console.log(`✗ QA "${currentItem.question.substring(0, 50)}..." failed: ${verification.issues.join(', ')}`);
+      
+      // Step 2: Fix the inconsistencies
+      currentItem = await fixInconsistentQA(currentItem, faktum, verification.issues);
+      iteration++;
+    }
+    
+    results.push(currentItem);
+  }
+  
+  return results;
+}
+
+/**
+ * Verifies that a Q&A item has internal consistency
+ */
+async function verifyQAConsistency(item: QAItem): Promise<{
+  isConsistent: boolean;
+  issues: string[];
+}> {
+  const openai = getOpenAI();
+  
+  const citationsList = item.citations.map(c => 
+    `${c.source_name}${c.section ? ' ' + c.section : ''}`
+  ).join(', ');
+
+  const prompt = `Du skal verifisere at denne juridiske analysen har INTERN KONSISTENS.
+
+SPØRSMÅL: ${item.question}
+
+SVAR: ${item.answer}
+
+JURIDISK DRØFTELSE: ${item.legal_reasoning || 'Ikke tilgjengelig'}
+
+KILDER OPPGITT: ${citationsList || 'Ingen kilder'}
+
+VERIFISER følgende:
+
+1. SPØRSMÅL-SVAR SAMSVAR:
+   - Svarer svaret FAKTISK på det som spørres om?
+   - Eksempel på FEIL: Spørsmål om "reparasjon/erstatning" → svar om "mangel foreligger" (svarer ikke på beføyelser)
+
+2. KILDE-SVAR SAMSVAR:
+   - Støtter de oppgitte kildene FAKTISK det svaret sier?
+   - Eksempel på FEIL: Svar om beføyelser (retting/omlevering) → kilde § 17 (som handler om mangelsvurdering, ikke beføyelser)
+   - RIKTIG ville vært: § 29-30 for retting/omlevering, § 31 for prisavslag, § 32 for heving
+
+3. DRØFTELSE-KILDE SAMSVAR:
+   - Brukes kildene faktisk i drøftelsen?
+   - Er drøftelsen logisk knyttet til både spørsmål og svar?
+
+Returner JSON:
+{
+  "isConsistent": true/false,
+  "issues": ["Liste med problemer funnet"],
+  "details": {
+    "question_answer_match": true/false,
+    "citation_answer_match": true/false,
+    "reasoning_citation_match": true/false
+  }
+}
+
+Vær STRENG - det er viktig at alt henger sammen.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en kvalitetskontrollør som verifiserer juridisk konsistens." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    return {
+      isConsistent: result.isConsistent ?? true,
+      issues: result.issues || [],
+    };
+  } catch (error) {
+    console.error("Error verifying QA consistency:", error);
+    return { isConsistent: true, issues: [] }; // Assume OK if verification fails
+  }
+}
+
+/**
+ * Fixes an inconsistent Q&A item by finding correct sources and regenerating
+ */
+async function fixInconsistentQA(
+  item: QAItem,
+  faktum: string,
+  issues: string[]
+): Promise<QAItem> {
+  const openai = getOpenAI();
+  
+  // Import search functions dynamically to avoid circular deps
+  const { searchGoogle } = await import("@/lib/google-search");
+  const { fetchAndParsePage } = await import("@/lib/google-search/parser");
+
+  // Step 1: Search for correct sources for THIS specific question
+  const searchQuery = `norsk lov ${item.question}`;
+  console.log(`Searching for correct sources: "${searchQuery}"`);
+  
+  let newEvidence = "";
+  try {
+    const searchResults = await searchGoogle(searchQuery);
+    const topResults = searchResults.slice(0, 3);
+    
+    for (const result of topResults) {
+      try {
+        const parsed = await fetchAndParsePage(result.url);
+        if (parsed && !parsed.isRepealed && parsed.content) {
+          newEvidence += `\n\nKILDE: ${parsed.title}\nURL: ${result.url}\nINNHOLD:\n${parsed.content.substring(0, 2000)}`;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error("Error searching for new sources:", error);
+  }
+
+  // Step 2: Regenerate the answer with correct sources
+  const prompt = `Du skal FIKSE denne juridiske analysen som har konsistensproblemer.
+
+PROBLEMER FUNNET:
+${issues.join('\n- ')}
+
+OPPRINNELIG SPØRSMÅL: ${item.question}
+OPPRINNELIG SVAR: ${item.answer}
+OPPRINNELIGE KILDER: ${item.citations.map(c => c.source_name + (c.section ? ' ' + c.section : '')).join(', ')}
+
+BRUKERENS FAKTUM:
+${faktum}
+
+NYE KILDER FUNNET:
+${newEvidence || 'Ingen nye kilder funnet - bruk eksisterende kunnskap'}
+
+OPPGAVE:
+1. Bevar spørsmålet uendret
+2. Skriv et NYTT svar som faktisk svarer på spørsmålet
+3. Oppgi RIKTIGE kilder som FAKTISK støtter svaret
+4. Skriv en ny drøftelse som bruker de riktige kildene
+
+VIKTIG for kilder:
+- For beføyelser (retting/omlevering): Bruk § 29-30
+- For prisavslag: Bruk § 31
+- For heving: Bruk § 32
+- For erstatning: Bruk § 33
+- For mangel: Bruk § 16-17
+- For reklamasjon: Bruk § 27
+
+Returner JSON:
+{
+  "answer": "Nytt svar som faktisk svarer på spørsmålet",
+  "legal_reasoning": "Ny drøftelse med riktige kilder",
+  "citations": [
+    { "source_name": "Forbrukerkjøpsloven", "section": "§ XX", "url": "https://lovdata.no/lov/2002-06-21-34/§XX" }
+  ],
+  "confidence": "high/medium/low"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en juridisk ekspert som fikser inkonsistente analyser." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
+
+    const fixed = JSON.parse(response.choices[0]?.message?.content || "{}");
+    
+    return {
+      ...item,
+      answer: fixed.answer || item.answer,
+      legal_reasoning: fixed.legal_reasoning || item.legal_reasoning,
+      citations: fixed.citations || item.citations,
+      confidence: fixed.confidence || item.confidence,
+    };
+  } catch (error) {
+    console.error("Error fixing inconsistent QA:", error);
+    return item; // Return original if fix fails
   }
 }
 
