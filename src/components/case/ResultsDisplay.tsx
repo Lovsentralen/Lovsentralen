@@ -214,30 +214,6 @@ export function ResultsDisplay({
                   </div>
                 )}
 
-                {/* Citations - Always visible at bottom */}
-                {qa.citations.length > 0 && (
-                  <div className="pt-3 border-t border-slate-100">
-                    <div className="flex flex-wrap gap-2">
-                      {qa.citations.map((citation, cidx) => (
-                        <a
-                          key={cidx}
-                          href={citation.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 hover:bg-amber-100 hover:text-amber-800 transition-colors"
-                        >
-                          <span>📎</span>
-                          <span>
-                            {citation.source_name}
-                            {citation.section && ` ${citation.section}`}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Expandable section for assumptions and missing facts */}
                 {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
                   <>
@@ -288,6 +264,33 @@ export function ResultsDisplay({
                       </button>
                     )}
                   </>
+                )}
+
+                {/* Citations - Always visible at VERY bottom */}
+                {qa.citations.length > 0 && (
+                  <div className="pt-4 mt-4 border-t border-slate-200">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      📚 Kilder
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {qa.citations.map((citation, cidx) => (
+                        <a
+                          key={cidx}
+                          href={citation.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition-colors"
+                        >
+                          <span>📎</span>
+                          <span>
+                            {citation.source_name}
+                            {citation.section && ` ${citation.section}`}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -386,30 +389,6 @@ export function ResultsDisplay({
                           </div>
                         )}
 
-                        {/* Citations - Always visible at bottom */}
-                        {qa.citations.length > 0 && (
-                          <div className="pt-3 border-t border-slate-100">
-                            <div className="flex flex-wrap gap-2">
-                              {qa.citations.map((citation, cidx) => (
-                                <a
-                                  key={cidx}
-                                  href={citation.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-800 transition-colors"
-                                >
-                                  <span>📎</span>
-                                  <span>
-                                    {citation.source_name}
-                                    {citation.section && ` ${citation.section}`}
-                                  </span>
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {/* Expandable section for assumptions and missing facts */}
                         {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
                           <>
@@ -457,6 +436,33 @@ export function ResultsDisplay({
                               </button>
                             )}
                           </>
+                        )}
+
+                        {/* Citations - Always visible at VERY bottom */}
+                        {qa.citations.length > 0 && (
+                          <div className="pt-3 mt-3 border-t border-slate-200">
+                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                              📚 Kilder
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {qa.citations.map((citation, cidx) => (
+                                <a
+                                  key={cidx}
+                                  href={citation.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200 transition-colors"
+                                >
+                                  <span>📎</span>
+                                  <span>
+                                    {citation.source_name}
+                                    {citation.section && ` ${citation.section}`}
+                                  </span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </CardContent>
