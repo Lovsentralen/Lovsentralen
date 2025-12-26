@@ -197,6 +197,23 @@ export function ResultsDisplay({
                   </div>
                 )}
 
+                {/* Legal reasoning - AI's thought process */}
+                {qa.legal_reasoning && (
+                  <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-500 mt-0.5">🧠</span>
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-800 mb-2">
+                          Juridisk drøftelse
+                        </h4>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                          {qa.legal_reasoning}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Citations - Always visible at bottom */}
                 {qa.citations.length > 0 && (
                   <div className="pt-3 border-t border-slate-100">
@@ -349,6 +366,23 @@ export function ResultsDisplay({
                               <span className="font-medium">Bruk: </span>
                               {qa.relevance_reason}
                             </p>
+                          </div>
+                        )}
+
+                        {/* Legal reasoning - AI's thought process */}
+                        {qa.legal_reasoning && (
+                          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                            <div className="flex items-start gap-2">
+                              <span className="text-slate-400 mt-0.5">🧠</span>
+                              <div>
+                                <h4 className="text-xs font-semibold text-slate-600 mb-1">
+                                  Juridisk drøftelse
+                                </h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                  {qa.legal_reasoning}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         )}
 

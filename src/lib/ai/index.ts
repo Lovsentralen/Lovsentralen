@@ -271,11 +271,14 @@ IKKE:
   const content = response.choices[0]?.message?.content || "{}";
   const parsed = JSON.parse(content);
 
-  // Post-processing: Clarify vague legal terms
+  // Post-processing step 1: Clarify vague legal terms
   const clarifiedQaItems = await clarifyVagueLegalTerms(parsed.qa_items || []);
+  
+  // Post-processing step 2: Add legal reasoning explanation
+  const withReasoning = await addLegalReasoning(clarifiedQaItems, faktum, evidenceText);
 
   return {
-    qa_items: clarifiedQaItems,
+    qa_items: withReasoning,
     checklist: parsed.checklist || [],
     documentation: parsed.documentation || [],
     sources: parsed.sources || [],
@@ -362,6 +365,83 @@ VIKTIG: Behold resten av svaret uendret - bare legg til forklaringen av det vage
   } catch (error) {
     console.error("Error clarifying vague terms:", error);
     return qaItems; // Return original if clarification fails
+  }
+}
+
+/**
+ * Post-processing step 2: Add legal reasoning explanation to each answer
+ * This explains HOW the AI reasoned and WHY it presented this answer
+ */
+async function addLegalReasoning(
+  qaItems: QAItem[],
+  faktum: string,
+  evidenceText: string
+): Promise<QAItem[]> {
+  const openai = getOpenAI();
+
+  const prompt = `Du skal forklare den juridiske tankeprosessen bak hvert svar.
+
+BRUKERENS FAKTUM:
+${faktum}
+
+SPØRSMÅL OG SVAR SOM TRENGER DRØFTELSE:
+${qaItems.map(item => `
+ID: ${item.id}
+Spørsmål: ${item.question}
+Svar: ${item.answer}
+Kilder brukt: ${item.citations.map(c => c.source_name + (c.section ? ' ' + c.section : '')).join(', ')}
+`).join('\n---\n')}
+
+For HVERT svar, skriv en kort juridisk drøftelse (3-5 setninger) som forklarer:
+
+1. REGELIDENTIFIKASJON: Hvilken lov/regel ble brukt og hvorfor akkurat denne?
+2. TOLKNING: Hvordan ble regelen tolket i denne saken?
+3. SUBSUMSJON: Hvordan ble fakta i saken koblet til vilkårene i regelen?
+4. KONKLUSJON: Hvorfor ble akkurat denne konklusjonen trukket?
+
+Drøftelsen skal være:
+- Pedagogisk og forklarende (som om du lærer bort jussen)
+- Konkret knyttet til brukerens faktum
+- Vise at svaret er basert på logisk juridisk resonnement
+
+Returner JSON:
+{
+  "reasonings": [
+    { "id": "qa1", "legal_reasoning": "Drøftelse her..." },
+    { "id": "qa2", "legal_reasoning": "Drøftelse her..." }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en juridisk pedagog som forklarer juridisk resonnement på en klar og forståelig måte." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 4000,
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    const reasonings = result.reasonings || [];
+
+    // Merge reasonings into qa items
+    return qaItems.map(item => {
+      const reasoning = reasonings.find((r: { id: string; legal_reasoning: string }) => r.id === item.id);
+      return {
+        ...item,
+        legal_reasoning: reasoning?.legal_reasoning || "Drøftelse ikke tilgjengelig.",
+      };
+    });
+  } catch (error) {
+    console.error("Error adding legal reasoning:", error);
+    // Return items with default reasoning if it fails
+    return qaItems.map(item => ({
+      ...item,
+      legal_reasoning: "Drøftelse ikke tilgjengelig.",
+    }));
   }
 }
 
