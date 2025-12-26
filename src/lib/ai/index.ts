@@ -276,9 +276,12 @@ IKKE:
   
   // Post-processing step 2: Add legal reasoning explanation
   const withReasoning = await addLegalReasoning(clarifiedQaItems, faktum, evidenceText);
+  
+  // Post-processing step 3: Sort in logical legal order (FINAL STEP)
+  const sortedQaItems = await sortInLegalOrder(withReasoning);
 
   return {
-    qa_items: withReasoning,
+    qa_items: sortedQaItems,
     checklist: parsed.checklist || [],
     documentation: parsed.documentation || [],
     sources: parsed.sources || [],
@@ -442,6 +445,79 @@ Returner JSON:
       ...item,
       legal_reasoning: "Drøftelse ikke tilgjengelig.",
     }));
+  }
+}
+
+/**
+ * Post-processing step 3 (FINAL): Sort Q&A items in logical legal order
+ * The order should follow how a lawyer would analyze a case:
+ * 1. Jurisdiction/applicable law (which law applies?)
+ * 2. Time limits/deadlines (reklamasjonsfrist, foreldelse)
+ * 3. Material conditions (is there a defect/mangel? breach of contract?)
+ * 4. Remedies/consequences (what can you claim? beføyelser)
+ */
+async function sortInLegalOrder(qaItems: QAItem[]): Promise<QAItem[]> {
+  if (qaItems.length <= 1) return qaItems;
+
+  const openai = getOpenAI();
+
+  const prompt = `Du skal sortere disse juridiske spørsmålene i LOGISK REKKEFØLGE.
+
+SPØRSMÅL SOM SKAL SORTERES:
+${qaItems.map(item => `ID: ${item.id}\nSpørsmål: ${item.question}`).join('\n\n')}
+
+SORTERINGSREGLER (juridisk metode):
+1. FØRST: Hvilket rettsområde/lov gjelder? (virkeområde)
+2. DERETTER: Er frister overholdt? (reklamasjon, foreldelse, søksmålsfrister)
+3. SÅ: Er vilkårene oppfylt? (mangel, mislighold, erstatningsansvar)
+4. TIL SLUTT: Hvilke krav/beføyelser kan gjøres gjeldende? (heving, prisavslag, erstatning)
+
+HVORFOR DENNE REKKEFØLGEN:
+- Man må vite at loven gjelder FØR man vurderer frister
+- Man må være innenfor frister FØR man vurderer om det er mangel
+- Man må ha en mangel FØR man kan kreve beføyelser
+
+Returner JSON med sortert rekkefølge:
+{
+  "sorted_ids": ["id som kommer først", "id som kommer nest", ...],
+  "reasoning": "Kort forklaring på hvorfor denne rekkefølgen"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en juridisk ekspert som organiserer analyser i logisk rekkefølge." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    const sortedIds: string[] = result.sorted_ids || [];
+
+    if (sortedIds.length === 0) return qaItems;
+
+    // Sort items according to the AI's ordering
+    const sortedItems: QAItem[] = [];
+    for (const id of sortedIds) {
+      const item = qaItems.find(q => q.id === id);
+      if (item) sortedItems.push(item);
+    }
+
+    // Add any items that weren't in the sorted list (safety net)
+    for (const item of qaItems) {
+      if (!sortedItems.find(q => q.id === item.id)) {
+        sortedItems.push(item);
+      }
+    }
+
+    console.log("Sorted Q&A in legal order:", result.reasoning);
+    return sortedItems;
+  } catch (error) {
+    console.error("Error sorting in legal order:", error);
+    return qaItems; // Return original order if sorting fails
   }
 }
 
