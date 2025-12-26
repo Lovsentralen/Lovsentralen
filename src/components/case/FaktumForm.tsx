@@ -5,25 +5,15 @@ import { useRouter } from "next/navigation";
 import {
   Button,
   Textarea,
-  Select,
   Card,
   CardContent,
   CardHeader,
   CardFooter,
 } from "@/components/ui";
-import { CATEGORY_LABELS } from "@/types";
-
-const categoryOptions = Object.entries(CATEGORY_LABELS).map(
-  ([value, label]) => ({
-    value,
-    label,
-  }),
-);
 
 export function FaktumForm() {
   const router = useRouter();
   const [faktum, setFaktum] = useState("");
-  const [category, setCategory] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +36,7 @@ export function FaktumForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           faktum_text: faktum.trim(),
-          category: category || null,
+          category: null,
         }),
       });
 
@@ -107,14 +97,6 @@ export function FaktumForm() {
             onChange={(e) => setFaktum(e.target.value)}
             className="min-h-[200px]"
             required
-          />
-
-          <Select
-            label="Kategori (valgfritt)"
-            options={categoryOptions}
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Velg en kategori..."
           />
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
