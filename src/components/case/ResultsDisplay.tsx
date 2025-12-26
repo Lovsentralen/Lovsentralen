@@ -214,16 +214,16 @@ export function ResultsDisplay({
                   </div>
                 )}
 
-                {/* Expandable section for assumptions and missing facts */}
-                {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
+                {/* Expandable section for assumptions and missing facts - only if relevant */}
+                {((qa.show_assumptions && qa.assumptions.length > 0) || qa.missing_facts.length > 0) && (
                   <>
                     {expandedQA === qa.id && (
                       <div className="space-y-4 pt-3 border-t border-slate-100">
-                        {/* Assumptions */}
-                        {qa.assumptions.length > 0 && (
+                        {/* Assumptions - only if show_assumptions is true */}
+                        {qa.show_assumptions && qa.assumptions.length > 0 && (
                           <div>
                             <h4 className="text-sm font-medium text-slate-900 mb-2">
-                              💭 Forutsetninger
+                              💭 Viktige forutsetninger
                             </h4>
                             <ul className="text-sm text-slate-600 space-y-1">
                               {qa.assumptions.map((assumption, aidx) => (
@@ -260,7 +260,7 @@ export function ResultsDisplay({
                         onClick={() => setExpandedQA(qa.id)}
                         className="text-sm text-amber-600 hover:text-amber-700 font-medium"
                       >
-                        Vis forutsetninger →
+                        {qa.show_assumptions && qa.assumptions.length > 0 ? 'Vis forutsetninger' : 'Vis detaljer'} →
                       </button>
                     )}
                   </>
@@ -389,15 +389,15 @@ export function ResultsDisplay({
                           </div>
                         )}
 
-                        {/* Expandable section for assumptions and missing facts */}
-                        {(qa.assumptions.length > 0 || qa.missing_facts.length > 0) && (
+                        {/* Expandable section for assumptions and missing facts - only if relevant */}
+                        {((qa.show_assumptions && qa.assumptions.length > 0) || qa.missing_facts.length > 0) && (
                           <>
                             {expandedQA === qa.id && (
                               <div className="space-y-4 pt-3 border-t border-slate-100">
-                                {qa.assumptions.length > 0 && (
+                                {qa.show_assumptions && qa.assumptions.length > 0 && (
                                   <div>
                                     <h4 className="text-sm font-medium text-slate-900 mb-2">
-                                      💭 Forutsetninger
+                                      💭 Viktige forutsetninger
                                     </h4>
                                     <ul className="text-sm text-slate-600 space-y-1">
                                       {qa.assumptions.map((assumption, aidx) => (
@@ -432,7 +432,7 @@ export function ResultsDisplay({
                                 onClick={() => setExpandedQA(qa.id)}
                                 className="text-sm text-slate-500 hover:text-slate-700 font-medium"
                               >
-                                Vis forutsetninger →
+                                {qa.show_assumptions && qa.assumptions.length > 0 ? 'Vis forutsetninger' : 'Vis detaljer'} →
                               </button>
                             )}
                           </>

@@ -78,6 +78,7 @@ export interface QAItem {
   relevance: number; // 1-10 score for how relevant this Q&A is to the user's specific case
   relevance_reason: string; // Brief explanation of why this Q&A is relevant to the user's specific situation
   legal_reasoning: string; // Detailed explanation of AI's legal reasoning process
+  show_assumptions: boolean; // Whether assumptions are relevant enough to display
 }
 
 export interface Citation {

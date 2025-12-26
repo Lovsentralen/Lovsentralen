@@ -349,11 +349,14 @@ IKKE:
   // Post-processing step 2: Add legal reasoning explanation
   const withReasoning = await addLegalReasoning(clarifiedQaItems, faktum, evidenceText);
   
-  // Post-processing step 3: Sort in logical legal order (FINAL STEP)
+  // Post-processing step 3: Sort in logical legal order
   const sortedQaItems = await sortInLegalOrder(withReasoning);
+  
+  // Post-processing step 4: Evaluate if assumptions should be shown (FINAL STEP)
+  const withAssumptionVisibility = await evaluateAssumptionRelevance(sortedQaItems);
 
   return {
-    qa_items: sortedQaItems,
+    qa_items: withAssumptionVisibility,
     checklist: parsed.checklist || [],
     documentation: parsed.documentation || [],
     sources: parsed.sources || [],
@@ -590,6 +593,88 @@ Returner JSON med sortert rekkefølge:
   } catch (error) {
     console.error("Error sorting in legal order:", error);
     return qaItems; // Return original order if sorting fails
+  }
+}
+
+/**
+ * Post-processing step 4 (FINAL): Evaluate if assumptions should be shown
+ * Only show assumptions when they are relevant and important for the user to know
+ */
+async function evaluateAssumptionRelevance(qaItems: QAItem[]): Promise<QAItem[]> {
+  // Filter items that have assumptions
+  const itemsWithAssumptions = qaItems.filter(item => item.assumptions.length > 0);
+  
+  if (itemsWithAssumptions.length === 0) {
+    // No assumptions to evaluate, mark all as false
+    return qaItems.map(item => ({ ...item, show_assumptions: false }));
+  }
+
+  const openai = getOpenAI();
+
+  const prompt = `Vurder om forutsetningene for hvert svar er VIKTIGE nok til å vise til brukeren.
+
+SPØRSMÅL OG FORUTSETNINGER:
+${itemsWithAssumptions.map(item => `
+ID: ${item.id}
+Spørsmål: ${item.question}
+Svar: ${item.answer}
+Forutsetninger: ${item.assumptions.join('; ')}
+`).join('\n---\n')}
+
+For HVER, vurder:
+1. Er forutsetningene AVGJØRENDE for svaret? (Ville svaret vært annerledes uten dem?)
+2. MÅ brukeren vite om disse forutsetningene for å forstå svaret riktig?
+3. Er forutsetningene SUBSTANSIELLE (ikke bare "standard" juridiske antagelser)?
+
+VIS forutsetninger når:
+- De kan endre konklusjonen betydelig
+- De handler om fakta brukeren kan påvirke/kontrollere
+- De er spesifikke for denne saken
+
+IKKE VIS forutsetninger når:
+- De er standard juridiske antagelser (f.eks. "loven gjelder")
+- De er åpenbare fra konteksten
+- De bare repeterer det brukeren allerede vet
+
+Returner JSON:
+{
+  "evaluations": [
+    { "id": "qa1", "show_assumptions": true, "reason": "Kort begrunnelse" }
+  ]
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du vurderer hvilke forutsetninger som er viktige å vise brukeren." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    const evaluations = result.evaluations || [];
+
+    // Merge evaluations into qa items
+    return qaItems.map(item => {
+      if (item.assumptions.length === 0) {
+        return { ...item, show_assumptions: false };
+      }
+      const evaluation = evaluations.find((e: { id: string; show_assumptions: boolean }) => e.id === item.id);
+      return {
+        ...item,
+        show_assumptions: evaluation?.show_assumptions ?? true, // Default to showing if not evaluated
+      };
+    });
+  } catch (error) {
+    console.error("Error evaluating assumption relevance:", error);
+    // Default to showing assumptions if evaluation fails
+    return qaItems.map(item => ({
+      ...item,
+      show_assumptions: item.assumptions.length > 0,
+    }));
   }
 }
 
