@@ -164,20 +164,38 @@ Du skal returnere en JSON-struktur med følgende:
    - "id": unik ID (qa1, qa2, etc.)
    - "question": Et relevant spørsmål brukeren kan ha
    - "answer": Et grundig svar basert på evidensen
-   - "citations": Liste med {"source_name", "section", "url"} - KRITISK: Hver kilde MÅ verifiseres!
+   - "citations": Liste med {"source_name", "section", "url"} - KRAV: MINST 2 KILDER PER SVAR!
+     
+     ANTALL KILDER:
+     * MINIMUM 2 kilder per svar - dette er et KRAV
+     * 3-4 kilder = bra, gir høyere troverdighet
+     * 5+ kilder = utmerket for komplekse spørsmål
+     * Bare 1 kilde = IKKE AKSEPTABELT (finn flere!)
+     
+     TYPER KILDER Å KOMBINERE:
+     * Lovtekst (§) - hovedkilden, MÅ alltid være med
+     * Forarbeider (Prop., Ot.prp., NOU) - for tolkning
+     * Rettspraksis (HR-, LA-, LB-dommer) - for anvendelse
+     * Forskrifter - når relevant
+     * Offentlige veiledere (regjeringen.no, forbrukertilsynet.no)
+     
      KRAV FOR HVER CITATION:
-     * source_name: Navnet på loven/kilden som FAKTISK støtter påstanden i svaret
-     * section: Den EKSAKTE paragrafen som er relevant (f.eks. "§ 27 første ledd", ikke bare "§ 27")
+     * source_name: Navnet på loven/kilden som FAKTISK støtter påstanden
+     * section: EKSAKT paragraf (f.eks. "§ 27 første ledd", ikke bare "§ 27")
      * url: URL fra evidensen som INNEHOLDER denne paragrafen
      
-     VERIFIKASJONSSTEG (gjør dette for HVER citation):
-     1. Les svaret du ga - hva er den konkrete juridiske påstanden?
-     2. Finn i evidensen hvor denne påstanden støttes
-     3. Verifiser at paragrafen du siterer FAKTISK handler om det svaret sier
-     4. IKKE gjenbruk samme paragraf for alle svar - finn den SPESIFIKKE paragrafen for HVER påstand
+     VERIFIKASJONSSTEG:
+     1. Les svaret - hva er påstanden?
+     2. Finn MINST 2 steder i evidensen som støtter dette
+     3. Verifiser at hver paragraf FAKTISK handler om det svaret sier
+     4. Bruk ULIKE paragrafer for ulike påstander i samme svar
      
-     EKSEMPEL PÅ FEIL: Svaret handler om reklamasjonsfrist, men citation viser til § 15 om mangler
-     EKSEMPEL PÅ RIKTIG: Svaret handler om reklamasjonsfrist, citation viser til § 27 om reklamasjon
+     EKSEMPEL PÅ GODT SVAR:
+     Svar om reklamasjon → citations: [
+       { "Forbrukerkjøpsloven", "§ 27 første ledd", url1 },  // Reklamasjonsfrist
+       { "Forbrukerkjøpsloven", "§ 27 annet ledd", url1 },   // 2-måneders minstekrav
+       { "Prop. 44 L (2021-2022)", "s. 45", url2 }           // Forarbeider om fristen
+     ]
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
@@ -217,19 +235,27 @@ VIKTIG:
 - Sorter qa_items etter BRUKBARHET (mest handlingsbare først)
 - relevance_reason SKAL forklare HVORDAN brukeren kan bruke svaret i praksis
 
-KRITISK - VERIFISERING AV KILDER:
-Før du returnerer JSON, gå gjennom HVER qa_item og verifiser:
-1. Les svaret på nytt - hva sier det konkret?
-2. For hver citation - støtter denne paragrafen FAKTISK det svaret sier?
-3. Er URL-en fra evidensen og inneholder den faktisk denne paragrafen?
-4. Hvis citation ikke matcher svaret - FJERN den og finn riktig paragraf
+KRAV TIL ANTALL KILDER:
+- MINIMUM 2 kilder per qa_item - dette er OBLIGATORISK
+- Hvis du bare finner 1 kilde, SØK HARDERE i evidensen
+- Kombiner ulike typer kilder: lovtekst + forarbeider, eller lovtekst + praksis
+- Flere relevante kilder = høyere confidence
+
+KONFIDENSREGLER:
+- 4+ relevante kilder = "høy"
+- 2-3 relevante kilder = "middels"
+- 1 kilde eller usikre kilder = "lav"
+
+VERIFISERING (gjør dette for HVER qa_item):
+1. Har svaret MINST 2 citations? Hvis nei, finn flere!
+2. Støtter HVER citation FAKTISK påstanden i svaret?
+3. Er paragrafene SPESIFIKKE nok? (§ 27 første ledd, ikke bare § 27)
+4. Kommer kildene fra ULIKE steder i evidensen?
 
 IKKE:
-- Gjenbruk samme paragraf (f.eks. § 27) for alle svar
-- Siter en paragraf du ikke har sett i evidensen
-- Siter feil paragraf bare for å ha en kilde
-
-HUSK: Det er bedre med 1 riktig kilde enn 4 feil kilder!`;
+- Godta bare 1 kilde per svar - finn flere!
+- Gjenbruk samme paragraf for alle svar
+- Siter paragrafer du ikke har sett i evidensen`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -245,12 +271,98 @@ HUSK: Det er bedre med 1 riktig kilde enn 4 feil kilder!`;
   const content = response.choices[0]?.message?.content || "{}";
   const parsed = JSON.parse(content);
 
+  // Post-processing: Clarify vague legal terms
+  const clarifiedQaItems = await clarifyVagueLegalTerms(parsed.qa_items || []);
+
   return {
-    qa_items: parsed.qa_items || [],
+    qa_items: clarifiedQaItems,
     checklist: parsed.checklist || [],
     documentation: parsed.documentation || [],
     sources: parsed.sources || [],
   };
+}
+
+// Vague legal terms that need explanation
+const VAGUE_TERMS = [
+  { term: "rimelig tid", explanation: "I forbrukerkjøp betyr 'rimelig tid' normalt 2-3 måneder, men aldri under 2 måneder fra mangelen ble oppdaget." },
+  { term: "vesentlig mangel", explanation: "En mangel er 'vesentlig' når den er så alvorlig at kjøper har god grunn til å si seg løst fra avtalen. Dette vurderes konkret." },
+  { term: "uforholdsmessig", explanation: "'Uforholdsmessig' betyr at kostnadene eller ulempene er urimelig store sammenlignet med nytten for den andre parten." },
+  { term: "uten ugrunnet opphold", explanation: "Dette betyr at man må handle raskt, normalt innen noen få dager til et par uker." },
+  { term: "innen rimelig tid", explanation: "Se 'rimelig tid' - normalt 2-3 måneder i forbrukersaker, kortere i næringssaker." },
+  { term: "god tro", explanation: "'God tro' betyr at man verken visste eller burde ha visst om forholdet." },
+  { term: "alminnelig kjent", explanation: "Noe er 'alminnelig kjent' når en vanlig person ville kjent til det uten spesiell undersøkelse." },
+];
+
+/**
+ * Post-processing step: Clarify vague legal terms in answers
+ * This runs AFTER the main analysis to ensure concrete answers
+ */
+async function clarifyVagueLegalTerms(qaItems: QAItem[]): Promise<QAItem[]> {
+  const openai = getOpenAI();
+  
+  // Check if any answers contain vague terms
+  const itemsWithVagueTerms = qaItems.filter(item => {
+    const answerLower = item.answer.toLowerCase();
+    return VAGUE_TERMS.some(vt => answerLower.includes(vt.term));
+  });
+
+  if (itemsWithVagueTerms.length === 0) {
+    return qaItems;
+  }
+
+  // Create clarification prompt
+  const prompt = `Du skal gjøre svarene mer KONKRETE ved å forklare vage juridiske begreper.
+
+SVAR SOM INNEHOLDER VAGE BEGREPER:
+${itemsWithVagueTerms.map(item => `ID: ${item.id}\nSvar: ${item.answer}`).join('\n\n')}
+
+VAGE BEGREPER SOM MÅ FORKLARES:
+${VAGUE_TERMS.map(vt => `- "${vt.term}": ${vt.explanation}`).join('\n')}
+
+For hvert svar som inneholder et vagt begrep:
+1. Identifiser det vage begrepet
+2. Legg til en KONKRET forklaring i parentes eller som en ekstra setning
+3. Gi et TALL eller TIDSRAMME når mulig
+
+Eksempel på forbedring:
+FØR: "Du må reklamere innen rimelig tid."
+ETTER: "Du må reklamere innen rimelig tid (i forbrukerkjøp betyr dette normalt 2-3 måneder, men aldri under 2 måneder fra du oppdaget mangelen)."
+
+Returner JSON:
+{
+  "clarified_answers": [
+    { "id": "qa1", "answer": "Forbedret svar med forklaring..." }
+  ]
+}
+
+VIKTIG: Behold resten av svaret uendret - bare legg til forklaringen av det vage begrepet.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en juridisk assistent som gjør vage svar mer konkrete." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
+
+    const clarified = JSON.parse(response.choices[0]?.message?.content || "{}");
+    const clarifiedAnswers = clarified.clarified_answers || [];
+
+    // Merge clarified answers back into original items
+    return qaItems.map(item => {
+      const clarification = clarifiedAnswers.find((c: { id: string; answer: string }) => c.id === item.id);
+      if (clarification) {
+        return { ...item, answer: clarification.answer };
+      }
+      return item;
+    });
+  } catch (error) {
+    console.error("Error clarifying vague terms:", error);
+    return qaItems; // Return original if clarification fails
+  }
 }
 
 export async function detectSensitiveTopics(faktum: string): Promise<{
