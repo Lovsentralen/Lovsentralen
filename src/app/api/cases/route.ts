@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { generateClarifyingQuestions, detectSensitiveTopics, quickExtractLegalDomain } from "@/lib/ai";
-import { searchGoogle } from "@/lib/google-search";
-import { fetchAndParsePage } from "@/lib/google-search/parser";
+import { generateClarifyingQuestions, detectSensitiveTopics, extractLegalIssues } from "@/lib/ai";
+import { searchMultipleQueries, generateSearchQueries } from "@/lib/google-search";
+import { fetchMultiplePages, extractRelevantExcerpts } from "@/lib/google-search/parser";
 import type { LegalCategory } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -52,43 +52,63 @@ export async function POST(request: NextRequest) {
     // Check for sensitive topics
     const sensitivityCheck = await detectSensitiveTopics(faktum_text);
 
-    // Step 1: Quick extract legal domain and search terms
-    const { domain, searchTerms } = await quickExtractLegalDomain(faktum_text, category);
-    
-    // Step 2: Do a preliminary search to get legal context
+    // FULL SEARCH PROCESS - Same as analysis phase, but to find relevant clarifying questions
     let legalContext = "";
     try {
-      // Search for the most relevant legal source
-      const searchQuery = `${searchTerms.slice(0, 2).join(" ")} ${domain} lovdata norsk lov`;
-      const searchResults = await searchGoogle(searchQuery, 5);
+      console.log("Starting full search process for clarifying questions...");
       
-      // Fetch the top 2 results to get context
-      const topUrls = searchResults.slice(0, 2).map(r => r.url);
-      const pageContents: string[] = [];
+      // Step 1: Extract legal issues from faktum (without clarifications yet)
+      const legalIssues = await extractLegalIssues(faktum_text, []);
+      console.log(`Identified ${legalIssues.length} legal issues`);
       
-      for (const url of topUrls) {
-        const page = await fetchAndParsePage(url);
-        if (page) {
-          // Extract key sections mentioning relevant terms
-          const relevantContent = page.sections
-            .filter(s => s.section_number || s.content.length > 100)
-            .slice(0, 3)
-            .map(s => `${s.section_number ? `${s.section_number}: ` : ""}${s.content.slice(0, 500)}`)
-            .join("\n");
-          
-          if (relevantContent) {
-            pageContents.push(`[${page.title}]\n${relevantContent}`);
-          }
+      // Step 2: Generate search queries for each issue
+      const allQueries: string[] = [];
+      for (const issue of legalIssues) {
+        const queries = generateSearchQueries(issue.issue, issue.domain);
+        allQueries.push(...queries);
+      }
+      console.log(`Generated ${allQueries.length} search queries`);
+      
+      // Step 3: Execute searches (limit to 10 queries for speed)
+      const searchResults = await searchMultipleQueries(allQueries.slice(0, 10));
+      console.log(`Found ${searchResults.length} search results`);
+      
+      // Step 4: Fetch and parse pages (limit to 8 for speed)
+      const urls = searchResults.slice(0, 8).map(r => r.url);
+      const parsedPages = await fetchMultiplePages(urls);
+      console.log(`Parsed ${parsedPages.length} pages`);
+      
+      // Step 5: Extract relevant excerpts for each issue
+      const allExcerpts: string[] = [];
+      for (const issue of legalIssues) {
+        const excerpts = extractRelevantExcerpts(parsedPages, issue.issue, 3);
+        for (const excerpt of excerpts) {
+          allExcerpts.push(
+            `[${excerpt.source.title}${excerpt.section ? ` ${excerpt.section}` : ""}]\n${excerpt.excerpt.slice(0, 800)}`
+          );
         }
       }
       
-      legalContext = pageContents.join("\n\n---\n\n");
+      // Build rich legal context
+      legalContext = `
+IDENTIFISERTE JURIDISKE PROBLEMSTILLINGER:
+${legalIssues.map((i, idx) => `${idx + 1}. ${i.issue} (${i.domain})`).join("\n")}
+
+RELEVANTE RETTSKILDER FUNNET:
+${allExcerpts.slice(0, 6).join("\n\n---\n\n")}
+
+Bruk denne informasjonen til å identifisere HVILKE FAKTA som faktisk mangler for å kunne anvende reglene korrekt.
+Still BARE spørsmål om fakta som er AVGJØRENDE for vilkårene i de relevante lovbestemmelsene.
+IKKE spør om generelle ting som "når skjedde dette" med mindre tidspunktet faktisk er juridisk relevant (f.eks. for frister).
+      `.trim();
+      
+      console.log("Legal context built successfully");
     } catch (error) {
-      console.error("Error in preliminary search:", error);
+      console.error("Error in full search process:", error);
       // Continue without context if search fails
     }
 
-    // Generate clarifying questions WITH legal context
+    // Generate clarifying questions WITH rich legal context from full search
     const questions = await generateClarifyingQuestions(faktum_text, category, legalContext || undefined);
 
     // Save clarifications

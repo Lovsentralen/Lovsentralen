@@ -224,32 +224,42 @@ ${faktum}
 KATEGORI: ${category || "Ikke spesifisert"}
 ${contextSection}
 
-VIKTIG REGEL: Still BARE spørsmål som er NØDVENDIGE for å dekke hull i faktum.
-- Hvis faktum allerede inneholder nok informasjon, still INGEN spørsmål (returner tom liste)
-- Hvis det mangler 1-2 kritiske opplysninger, still 1-2 spørsmål
-- Still MAKS 3 spørsmål, men ALDRI mer enn nødvendig
-- De fleste saker trenger bare 1-2 spørsmål, ikke 3
+KRITISK REGEL: Bruk den juridiske konteksten til å identifisere HVILKE VILKÅR i loven som krever mer informasjon.
 
-Spørsmål skal KUN stilles hvis svaret vil:
-- Endre hvilken lov som gjelder (forbruker vs næringsdrivende)
-- Påvirke om frister er overholdt (kjøpstidspunkt, reklamasjonstidspunkt)
-- Avgjøre om vilkår er oppfylt (skriftlig avtale, varsel gitt)
+IKKE SPØR OM:
+- "Når skjedde dette?" - med mindre tidspunktet er JURIDISK AVGJØRENDE (f.eks. reklamasjonsfrist, foreldelsesfrist)
+- Generell bakgrunnsinformasjon som ikke påvirker vilkårene
+- Ting brukeren allerede har fortalt i faktum
+- Hypotetiske situasjoner
 
-${legalContext ? `Basert på den juridiske konteksten, fokuser på fakta som er AVGJØRENDE for å anvende de relevante reglene:
-- Reklamasjon: tidspunkt for kjøp og oppdagelse (KUN hvis ikke nevnt i faktum)
-- Oppsigelse: ansettelsestid og skriftlighet (KUN hvis ikke nevnt i faktum)
-- Husleie: type leieforhold (KUN hvis ikke nevnt i faktum)` : `Hvis noe mangler, fokuser på:
-- Tidslinje (når skjedde ting) - KUN hvis ikke allerede oppgitt
-- Parter (forbruker/næringsdrivende) - KUN hvis uklart
-- Dokumentasjon - KUN hvis avgjørende for saken`}
+SPØR BARE OM:
+- Fakta som direkte påvirker et VILKÅR i loven (f.eks. "var det skriftlig avtale?" for avtl. § 2)
+- Fakta som avgjør HVILKET REGELSETT som gjelder (f.eks. forbruker vs næringsdrivende)
+- Fakta om FRISTER kun hvis det er relevant for reklamasjon/foreldelse OG tidspunktet ikke er oppgitt
+- Fakta om HVA SOM ER GJORT (reklamasjon, varsling) kun hvis det påvirker rettigheter
 
-Spørsmålene skal være enkle, konkrete, og direkte knyttet til et hull i faktum.
+${legalContext ? `
+Konteksten viser hvilke lover og vilkår som er relevante. Analyser:
+1. Hvilke VILKÅR i de relevante lovene trenger mer informasjon?
+2. Er vilkåret allerede dekket av faktum brukeren har gitt?
+3. Vil svaret på spørsmålet FAKTISK endre den juridiske vurderingen?
+
+Hvis alle viktige vilkår er dekket av faktum, still INGEN spørsmål.` : `
+Fokuser på:
+- Partsforhold (forbruker/næringsdrivende) - KUN hvis uklart
+- Skriftlighet/dokumentasjon - KUN hvis juridisk relevant
+- Varsling/reklamasjon - KUN hvis ikke nevnt`}
+
+ANTALL SPØRSMÅL:
+- 0 spørsmål: Faktum dekker de viktigste vilkårene
+- 1 spørsmål: Det mangler én kritisk opplysning
+- 2 spørsmål: Det mangler to kritiske opplysninger (sjelden)
+- 3 spørsmål: Kun i komplekse saker med flere uklare vilkår (veldig sjelden)
 
 Returner som JSON:
-{ "questions": [] } // Tom liste hvis faktum er tilstrekkelig
-{ "questions": ["Spørsmål 1"] } // Ofte nok med 1 spørsmål
-{ "questions": ["Spørsmål 1", "Spørsmål 2"] } // Sjelden mer enn 2
-{ "questions": ["Spørsmål 1", "Spørsmål 2", "Spørsmål 3"] } // Bare hvis absolutt nødvendig`;
+{ "questions": [] }
+{ "questions": ["Ett konkret spørsmål knyttet til et vilkår"] }
+{ "questions": ["Spørsmål om vilkår 1", "Spørsmål om vilkår 2"] }`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
