@@ -121,8 +121,80 @@ Returner som JSON:
 
   const content = response.choices[0]?.message?.content || '{"questions": []}';
   const parsed = JSON.parse(content);
-  // Ensure maximum of 3 questions
-  return (parsed.questions || []).slice(0, 3);
+  const questions = (parsed.questions || []).slice(0, 3);
+  
+  // Post-processing: Filter out questions already answered in faktum
+  const filteredQuestions = await filterAlreadyAnsweredQuestions(questions, faktum);
+  
+  return filteredQuestions;
+}
+
+/**
+ * Filter out clarifying questions that have already been answered in the faktum
+ * This is a safety check to avoid redundant questions
+ */
+async function filterAlreadyAnsweredQuestions(
+  questions: string[],
+  faktum: string
+): Promise<string[]> {
+  if (questions.length === 0) return [];
+
+  const openai = getOpenAI();
+
+  const prompt = `Du skal sjekke om følgende oppklarende spørsmål allerede er besvart i faktum.
+
+FAKTUM (brukerens beskrivelse):
+${faktum}
+
+SPØRSMÅL SOM VURDERES:
+${questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+For HVERT spørsmål, vurder:
+1. Er informasjonen som spørsmålet etterspør ALLEREDE gitt i faktum?
+2. Kan svaret utledes direkte fra det brukeren har skrevet?
+
+Returner JSON:
+{
+  "analysis": [
+    {
+      "question_index": 0,
+      "already_answered": true/false,
+      "reason": "Kort forklaring på hvorfor spørsmålet er/ikke er besvart"
+    }
+  ],
+  "questions_to_keep": ["Liste med spørsmål som IKKE er besvart og bør stilles"]
+}
+
+VIKTIG: 
+- Vær STRENG - hvis det er tvil, behold spørsmålet
+- Fjern bare spørsmål som KLART er besvart i faktum
+- Spørsmål om "når" er ofte allerede besvart med tidspunkter i faktum`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "Du er en assistent som analyserer om spørsmål allerede er besvart." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    const keptQuestions = result.questions_to_keep || questions;
+    
+    // Log what was filtered
+    const removed = questions.filter(q => !keptQuestions.includes(q));
+    if (removed.length > 0) {
+      console.log("Filtered out already-answered questions:", removed);
+    }
+    
+    return keptQuestions;
+  } catch (error) {
+    console.error("Error filtering questions:", error);
+    return questions; // Return original if filtering fails
+  }
 }
 
 export async function generateLegalAnalysis(
