@@ -168,8 +168,16 @@ Du skal returnere en JSON-struktur med følgende:
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
-   - "relevance": Tall 1-10 for hvor relevant dette er for brukerens spesifikke sak (10=avgjørende, 7+=viktig, <7=bakgrunn)
-   - "relevance_reason": Kort forklaring (1-2 setninger) på HVORFOR dette svaret er relevant for denne brukerens situasjon. Referer til konkrete detaljer fra faktum. Eksempel: "Siden du kjøpte varen for 3 uker siden, er reklamasjonsfristen spesielt viktig for din sak."
+   - "relevance": Tall 1-10 for hvor BRUKBART dette svaret er for brukerens rettssak:
+     * 10 = Direkte handlingsbart - brukeren kan GJØRE noe konkret basert på dette (f.eks. "du kan kreve X", "du bør sende brev til Y")
+     * 8-9 = Svært nyttig - gir brukeren konkrete rettigheter eller frister å forholde seg til
+     * 7 = Nyttig - hjelper brukeren forstå sin posisjon og muligheter
+     * 5-6 = Bakgrunnsinformasjon - forklarer juridiske konsepter
+     * 1-4 = Teoretisk - generell juss uten direkte nytte for denne saken
+   - "relevance_reason": Kort forklaring (1-2 setninger) på HVORDAN brukeren kan BRUKE dette svaret i sin sak. Vær konkret og handlingsorientert. Eksempler:
+     * "Du kan bruke dette til å kreve pengene tilbake fra Elkjøp ved å vise til forbrukerkjøpsloven § 27."
+     * "Dette betyr at du har 2 måneder på deg til å reklamere - send skriftlig klage til selger snarest."
+     * "Basert på dette kan du argumentere for at varen hadde en mangel ved levering."
 
 2. "checklist": 5-8 konkrete handlinger brukeren bør gjøre, med:
    - "id": unik ID
@@ -193,8 +201,8 @@ VIKTIG:
 - Hvis noe ikke kan bekreftes av evidensen, si det eksplisitt
 - Konfidensen skal reflektere hvor godt evidensen støtter svaret
 - Svarene skal være på norsk, i et enkelt språk
-- Sorter qa_items etter relevance (høyest først)
-- relevance_reason SKAL forklare hvorfor svaret er viktig for DENNE brukerens situasjon`;
+- Sorter qa_items etter BRUKBARHET (mest handlingsbare først)
+- relevance_reason SKAL forklare HVORDAN brukeren kan bruke svaret i praksis`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",

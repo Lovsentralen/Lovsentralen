@@ -186,12 +186,12 @@ export function ResultsDisplay({
               <div className="ml-11 space-y-4">
                 <p className="text-slate-700 leading-relaxed">{qa.answer}</p>
 
-                {/* Relevance reason - Why this is relevant to the user */}
+                {/* Usefulness reason - How the user can use this */}
                 {qa.relevance_reason && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                    <span className="text-amber-600 mt-0.5">💡</span>
-                    <p className="text-sm text-amber-800">
-                      <span className="font-medium">Hvorfor dette er relevant for deg: </span>
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                    <span className="text-green-600 mt-0.5">⚡</span>
+                    <p className="text-sm text-green-800">
+                      <span className="font-medium">Slik kan du bruke dette: </span>
                       {qa.relevance_reason}
                     </p>
                   </div>
@@ -341,12 +341,12 @@ export function ResultsDisplay({
                       <div className="ml-11 space-y-4">
                         <p className="text-slate-600 leading-relaxed">{qa.answer}</p>
 
-                        {/* Relevance reason - Why this is relevant to the user */}
+                        {/* Usefulness reason - How the user can use this */}
                         {qa.relevance_reason && (
                           <div className="flex items-start gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                            <span className="text-slate-500 mt-0.5">💡</span>
+                            <span className="text-slate-500 mt-0.5">⚡</span>
                             <p className="text-sm text-slate-600">
-                              <span className="font-medium">Relevans: </span>
+                              <span className="font-medium">Bruk: </span>
                               {qa.relevance_reason}
                             </p>
                           </div>
