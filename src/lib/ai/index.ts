@@ -164,7 +164,20 @@ Du skal returnere en JSON-struktur med følgende:
    - "id": unik ID (qa1, qa2, etc.)
    - "question": Et relevant spørsmål brukeren kan ha
    - "answer": Et grundig svar basert på evidensen
-   - "citations": Liste med {"source_name", "section", "url"} - Hvert svar bør ha 2-4 kilder
+   - "citations": Liste med {"source_name", "section", "url"} - KRITISK: Hver kilde MÅ verifiseres!
+     KRAV FOR HVER CITATION:
+     * source_name: Navnet på loven/kilden som FAKTISK støtter påstanden i svaret
+     * section: Den EKSAKTE paragrafen som er relevant (f.eks. "§ 27 første ledd", ikke bare "§ 27")
+     * url: URL fra evidensen som INNEHOLDER denne paragrafen
+     
+     VERIFIKASJONSSTEG (gjør dette for HVER citation):
+     1. Les svaret du ga - hva er den konkrete juridiske påstanden?
+     2. Finn i evidensen hvor denne påstanden støttes
+     3. Verifiser at paragrafen du siterer FAKTISK handler om det svaret sier
+     4. IKKE gjenbruk samme paragraf for alle svar - finn den SPESIFIKKE paragrafen for HVER påstand
+     
+     EKSEMPEL PÅ FEIL: Svaret handler om reklamasjonsfrist, men citation viser til § 15 om mangler
+     EKSEMPEL PÅ RIKTIG: Svaret handler om reklamasjonsfrist, citation viser til § 27 om reklamasjon
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
@@ -202,7 +215,21 @@ VIKTIG:
 - Konfidensen skal reflektere hvor godt evidensen støtter svaret
 - Svarene skal være på norsk, i et enkelt språk
 - Sorter qa_items etter BRUKBARHET (mest handlingsbare først)
-- relevance_reason SKAL forklare HVORDAN brukeren kan bruke svaret i praksis`;
+- relevance_reason SKAL forklare HVORDAN brukeren kan bruke svaret i praksis
+
+KRITISK - VERIFISERING AV KILDER:
+Før du returnerer JSON, gå gjennom HVER qa_item og verifiser:
+1. Les svaret på nytt - hva sier det konkret?
+2. For hver citation - støtter denne paragrafen FAKTISK det svaret sier?
+3. Er URL-en fra evidensen og inneholder den faktisk denne paragrafen?
+4. Hvis citation ikke matcher svaret - FJERN den og finn riktig paragraf
+
+IKKE:
+- Gjenbruk samme paragraf (f.eks. § 27) for alle svar
+- Siter en paragraf du ikke har sett i evidensen
+- Siter feil paragraf bare for å ha en kilde
+
+HUSK: Det er bedre med 1 riktig kilde enn 4 feil kilder!`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
