@@ -23,148 +23,18 @@ function getOpenAI(): OpenAI {
   return openaiClient;
 }
 
-const SYSTEM_PROMPT = `Du er Lovsentralen-botten. Oppgaven din er å ta imot brukerens faktum (fri tekst om hva som har skjedd) og gjøre en juridisk analyse som følger norsk juridisk metode. Du skal alltid arbeide strukturert, uten å finne på fakta, og med skarpt fokus på riktige rettskilder og tolkning/anvendelse av disse.
+const SYSTEM_PROMPT = `Du er en juridisk rådgiver-assistent som hjelper norske brukere med å forstå deres rettigheter og plikter.
 
-Du skal gjøre følgende, i denne rekkefølgen:
+VIKTIGE REGLER:
+1. Svar ALLTID på norsk (bokmål)
+2. Bruk et klart, enkelt språk som ikke-jurister kan forstå
+3. ALDRI gi konkrete råd uten å ha evidens fra søkeresultatene
+4. Hvis du er usikker, si det tydelig og forklar hvorfor
+5. Henvis ALLTID til kilder med § og lovnavn når relevant
+6. Dette er IKKE erstatning for juridisk rådgivning fra advokat
 
-1) Forstå og strukturér faktum
-- Les hele faktumet nøye.
-- Trekk ut og hold orden på: parter, roller (forbruker/selger/arbeidsgiver osv.), tidspunkter, hendelsesforløp, ytelser/avtaleinnhold, påstander om feil/mangel, kommunikasjon/reklamasjon, og hva brukeren ønsker.
-- Ikke finn på fakta. Hvis noe er uklart eller mangler, merk det som et mulig hull.
-- Når du strukturerer faktum skal du tenke som en jurist: Hva er relevant for vilkår, frister og rettsfølger? Hva er irrelevant? Hva kan påvirke utfallet?
-
-2) Identifiser relevante rettslige spørsmål
-- Formuler de rettslige spørsmålene som må besvares for å vurdere brukerens rettslige stilling.
-- Spørsmålene skal være av typen "vilkår → rettsfølge", typisk:
-  a) Hvilket regelsett/lov gjelder (virkeområde/sporvalg)?
-  b) Foreligger vilkår (mangel, mislighold, ansvarsgrunnlag osv.)?
-  c) Er frister/krav oppfylt (reklamasjon, foreldelse, prosessuelle frister)?
-  d) Hvilke rettigheter/krav kan gjøres gjeldende (beføyelser/rettsfølger)?
-- Lag en prioritert liste over spørsmålene. Ta med bare det som er relevant.
-- Spørsmålene må være formulert slik at de faktisk kan besvares med rettskilder og faktum. Unngå "fluffy" spørsmål.
-
-3) Vurder om du må stille oppfølgingsspørsmål (maks 3)
-- Du skal som hovedregel ikke stille oppfølgingsspørsmål.
-- Still oppfølgingsspørsmål kun hvis det er nødvendig for sakens klarhet:
-  - det finnes hull i faktum,
-  - og svaret på hullet har betydning for vurderingen av ett eller flere av de identifiserte spørsmålene.
-- Du kan stille maks 3 spørsmål totalt.
-- Spørsmålene skal være korte, konkrete og faktabaserte (ikke juridiske utredninger).
-- Still bare spørsmål som (i) brukeren realistisk kan svare på, og (ii) som faktisk påvirker vilkår/frister/rettsfølge.
-- Hvis faktum er tilstrekkelig til å gå videre, still 0 spørsmål.
-- Hvis du kan gi en vurdering basert på det som foreligger ved å ta nødvendige forbehold, skal du som hovedregel heller gi vurdering med forbehold enn å bruke opp oppfølgingsspørsmål.
-
-4) Finn relevante rettskilder på internett
-- Når du har tilstrekkelig faktum (enten umiddelbart eller etter oppfølgingsspørsmål), skal du søke på internett og finne relevante rettskilder for å besvare hvert spørsmål.
-- Prioriteringsrekkefølge:
-  1) Lovtekst (hovedkilde)
-  2) Forarbeider (når relevant for tolkning)
-  3) Høyesterettsdommer (når relevant)
-  4) Lagmannsrett/rettslitteratur (kun i enkelte tilfeller, hvis relevant og tilgjengelig)
-- Du skal finne frem hovedsakelig til lovene, siden de fleste spørsmål kan besvares kun med hjelp av denne, men også forarbeider til lovene, høyesterettsdommer, og i enkelte tilfeller, dommer fra lagmannsretten/rettslitteratur om det finnes.
-- Du skal ikke gjengi rettskildene ordrett i stor skala. Du skal tolke, analysere, og anvende dem.
-- Du skal føre en ryddig liste over hvilke kilder som faktisk er brukt, og knytte dem til de spørsmålene de støtter.
-
-5) Besvar hvert spørsmål separat (formatkrav)
-For hvert identifisert spørsmål skal du levere:
-- Overskrift: tydelig konklusjon (kort).
-- Sammendrag: kort forklaring på hvorfor dette er riktig svar, med fokus på rettsregel + anvendelse på faktum.
-- "Se mer": mer omfattende begrunnelse/drøftelse som viser:
-  - hvilke rettsregler som brukes,
-  - hvordan de tolkes,
-  - hvordan de anvendes på faktum,
-  - og hvorfor konklusjonen følger.
-- Du skal ikke lime inn store lovutdrag. Du skal bruke kildene til å tolke og anvende.
-
-6) Juridisk metodekrav (hvordan du skal resonnere for at svarene blir gode på ALL faktum)
-For hvert spørsmål skal du alltid følge denne kjernen:
-- Avgrensning: Hva er det konkrete spørsmålet? Hva må avgjøres? Hva er relevant?
-- Regelidentifikasjon: Hvilken bestemmelse/regel er relevant (først og fremst lovtekst)?
-- Tolkning: Start med ordlyd. Hvis ordlyden er uklar, skjønnsmessig, eller krever avveiing, bruk forarbeider og praksis for å presisere innholdet.
-- Subsumpsjon/anvendelse: Knytt vilkårene i regelen direkte til konkrete faktumopplysninger (og bare slike opplysninger som faktisk er gitt).
-- Konklusjon: Konkluder tydelig og konsist.
-
-Skillelinjer og presisjon:
-- Skill alltid tydelig mellom: (i) faktum (opplysninger brukeren har gitt), (ii) rettsregel (kildegrunnlaget), og (iii) vurdering/anvendelse (ditt resonnement).
-- Ikke fyll inn manglende faktum med antakelser. Dersom et punkt er uklart:
-  - si eksplisitt at det er uklart,
-  - forklar hvorfor det har betydning,
-  - forklar hvilke alternative utfall det kan gi,
-  - og still bare oppfølgingsspørsmål hvis dette er nødvendig for sakens klarhet (maks 3).
-- Unngå bastante utsagn når faktum er ufullstendig eller rettstilstanden er usikker. Bruk forbehold og forklar hva som kan endre vurderingen.
-
-7) Presisering av oppfølgingsspørsmål (maks 3) – når de er "nødvendige"
-Du skal stille oppfølgingsspørsmål kun når:
-- du ellers ikke kan vurdere ett eller flere kjernevilkår på en forsvarlig måte, eller
-- informasjonen kan endre konklusjonen på ett eller flere av de identifiserte spørsmålene.
-
-Oppfølgingsspørsmål skal typisk brukes til:
-- rolle/part (forbruker vs. næringsdrivende, arbeidstaker vs. oppdragstaker osv.)
-- tidspunkt (frister, reklamasjon, foreldelse)
-- hva som faktisk ble avtalt/markedsført
-- hva som er gjort av varsling/reklamasjon og når
-- om det foreligger relevante dokumenter/kommunikasjon (uten at du ber brukeren lime inn alt; du kan spørre kort "har du reklamert skriftlig?" etc.)
-
-Spørsmålene skal være:
-- maks 3 totalt
-- korte og faktabaserte
-- formulert slik at brukeren kan svare enkelt
-- direkte knyttet til et identifisert rettslig spørsmål (du skal "vite" hvorfor du spør)
-
-8) Krav til rettskildesøk og kildebruk (kvalitet)
-- Du skal alltid starte i lovtekst når det finnes et relevant lovspor.
-- Du skal bruke forarbeider når:
-  - ordlyden gir rom for flere tolkninger,
-  - det er skjønnsstandarder ("rimelig tid", "uforholdsmessig", "vesentlig"),
-  - eller det er behov for presisering av formål og rekkevidde.
-- Du skal bruke Høyesterett når:
-  - spørsmålet handler om rettslig standard/terskel,
-  - det finnes tvist om forståelsen av vilkår,
-  - eller vurderingen typisk styres av praksis.
-- Lagmannsrett og rettslitteratur skal bare brukes når relevant og når det faktisk tilfører verdi (f.eks. mangel på HR-praksis, eller behov for å belyse et punkt).
-- Du skal ikke gjengi rettskilder ordrett i stor skala. Du skal tolke og anvende dem.
-
-9) Resultatkrav (hvordan sluttproduktet skal fremstå for brukeren)
-- Du skal svare på alle identifiserte spørsmål.
-- Først: et kort og klart svar (overskrift + sammendrag).
-- Deretter: "Se mer" med en mer omfattende begrunnelse.
-- Brukeren skal oppleve at hvert spørsmål er behandlet separat, ryddig, og med tydelig rettskildeanknytning.
-
-VIKTIG DISCLAIMER:
+DISCLAIMER som må inkluderes:
 "Dette er kun generell informasjon og ikke juridisk rådgivning. For konkrete juridiske spørsmål, kontakt en advokat."`;
-
-export async function quickExtractLegalDomain(
-  faktum: string,
-  category: string | null,
-): Promise<{ domain: string; searchTerms: string[] }> {
-  const openai = getOpenAI();
-  
-  const prompt = `Analyser følgende faktum kort for å identifisere rettsområdet og relevante søkeord.
-
-FAKTUM:
-${faktum}
-
-KATEGORI: ${category || "Ikke spesifisert"}
-
-Returner JSON:
-{
-  "domain": "Hovedrettsområdet (f.eks. Forbrukerkjøp, Husleie, Arbeidsrett)",
-  "searchTerms": ["3-4 spesifikke juridiske søkeord for å finne relevant lovverk"]
-}`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.3,
-    response_format: { type: "json_object" },
-  });
-
-  const content = response.choices[0]?.message?.content || '{"domain": "Generelt", "searchTerms": []}';
-  return JSON.parse(content);
-}
 
 export async function extractLegalIssues(
   faktum: string,
@@ -213,7 +83,7 @@ export async function generateClarifyingQuestions(
   const openai = getOpenAI();
   
   const contextSection = legalContext 
-    ? `\nJURIDISK KONTEKST FRA SØKERESULTATER:\n${legalContext}\n\nBruk denne konteksten til å stille spørsmål som er spesifikt relevante for de juridiske reglene som gjelder.`
+    ? `\nJURIDISK KONTEKST FRA RETTSKILDER:\n${legalContext}`
     : "";
 
   const prompt = `Du skal vurdere om det trengs oppklarende spørsmål for å forstå brukerens juridiske situasjon.
@@ -224,42 +94,20 @@ ${faktum}
 KATEGORI: ${category || "Ikke spesifisert"}
 ${contextSection}
 
-KRITISK REGEL: Bruk den juridiske konteksten til å identifisere HVILKE VILKÅR i loven som krever mer informasjon.
+VIKTIG: Still BARE spørsmål som er NØDVENDIGE for å dekke hull i faktum.
+- Hvis faktum er tilstrekkelig, still INGEN spørsmål (returner tom liste)
+- De fleste saker trenger bare 0-2 spørsmål, sjelden 3
 
-IKKE SPØR OM:
-- "Når skjedde dette?" - med mindre tidspunktet er JURIDISK AVGJØRENDE (f.eks. reklamasjonsfrist, foreldelsesfrist)
-- Generell bakgrunnsinformasjon som ikke påvirker vilkårene
-- Ting brukeren allerede har fortalt i faktum
-- Hypotetiske situasjoner
-
-SPØR BARE OM:
-- Fakta som direkte påvirker et VILKÅR i loven (f.eks. "var det skriftlig avtale?" for avtl. § 2)
-- Fakta som avgjør HVILKET REGELSETT som gjelder (f.eks. forbruker vs næringsdrivende)
-- Fakta om FRISTER kun hvis det er relevant for reklamasjon/foreldelse OG tidspunktet ikke er oppgitt
-- Fakta om HVA SOM ER GJORT (reklamasjon, varsling) kun hvis det påvirker rettigheter
-
-${legalContext ? `
-Konteksten viser hvilke lover og vilkår som er relevante. Analyser:
-1. Hvilke VILKÅR i de relevante lovene trenger mer informasjon?
-2. Er vilkåret allerede dekket av faktum brukeren har gitt?
-3. Vil svaret på spørsmålet FAKTISK endre den juridiske vurderingen?
-
-Hvis alle viktige vilkår er dekket av faktum, still INGEN spørsmål.` : `
-Fokuser på:
+${legalContext ? `Bruk rettskildene til å identifisere hvilke VILKÅR i loven som krever mer informasjon.
+IKKE spør om "når skjedde dette" med mindre det er juridisk avgjørende (f.eks. for frister).
+Spør BARE om fakta som faktisk påvirker den juridiske vurderingen.` : `Fokuser på:
 - Partsforhold (forbruker/næringsdrivende) - KUN hvis uklart
-- Skriftlighet/dokumentasjon - KUN hvis juridisk relevant
 - Varsling/reklamasjon - KUN hvis ikke nevnt`}
 
-ANTALL SPØRSMÅL:
-- 0 spørsmål: Faktum dekker de viktigste vilkårene
-- 1 spørsmål: Det mangler én kritisk opplysning
-- 2 spørsmål: Det mangler to kritiske opplysninger (sjelden)
-- 3 spørsmål: Kun i komplekse saker med flere uklare vilkår (veldig sjelden)
-
 Returner som JSON:
-{ "questions": [] }
-{ "questions": ["Ett konkret spørsmål knyttet til et vilkår"] }
-{ "questions": ["Spørsmål om vilkår 1", "Spørsmål om vilkår 2"] }`;
+{ "questions": [] } // Hvis faktum er tilstrekkelig
+{ "questions": ["Spørsmål 1"] } // Ofte nok med 1
+{ "questions": ["Spørsmål 1", "Spørsmål 2"] } // Sjelden mer`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -273,9 +121,8 @@ Returner som JSON:
 
   const content = response.choices[0]?.message?.content || '{"questions": []}';
   const parsed = JSON.parse(content);
-  // Return only necessary questions (0-3), AI should already limit this
-  const questions = parsed.questions || [];
-  return questions.slice(0, 3);
+  // Ensure maximum of 3 questions
+  return (parsed.questions || []).slice(0, 3);
 }
 
 export async function generateLegalAnalysis(
@@ -317,32 +164,12 @@ Du skal returnere en JSON-struktur med følgende:
    - "id": unik ID (qa1, qa2, etc.)
    - "question": Et relevant spørsmål brukeren kan ha
    - "answer": Et grundig svar basert på evidensen
-   - "citations": Liste med {"source_name", "section", "url"} - KRAV: Hvert svar SKAL ha MINST 2-4 kilder!
-     * Prioriter å finne flere ulike kilder som støtter svaret
-     * Bruk både lovtekst OG forarbeider/praksis når mulig
-     * Inkluder spesifikke paragrafhenvisninger (f.eks. "§ 27 første ledd")
-     * Jo flere relevante kilder, jo høyere confidence
+   - "citations": Liste med {"source_name", "section", "url"} - Hvert svar bør ha 2-4 kilder
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
-   - "relevance": Et tall fra 1-10 som angir hvor relevant dette spørsmålet er for DENNE SPESIFIKKE brukerens situasjon:
-     * 10 = Helt avgjørende for brukerens sak, direkte knyttet til hovedproblemet
-     * 8-9 = Svært relevant, viktig for å forstå brukerens rettsstilling
-     * 7 = Relevant og nyttig for brukeren å vite
-     * 5-6 = Noe relevant, men mer generell informasjon
-     * 1-4 = Lite relevant for denne spesifikke saken, bakgrunnsinformasjon
-   - "relevance_reason": En kort setning (maks 2 setninger) som forklarer HVORFOR dette spørsmålet er relevant for denne brukerens spesifikke situasjon. 
-     * Referer til konkrete detaljer fra brukerens faktum
-     * Forklar hvordan dette svaret hjelper brukeren
-     * Eksempel: "Siden du kjøpte varen for 3 uker siden, er reklamasjonsfristen spesielt viktig for din sak."
-     * Eksempel: "Du nevnte at selger nekter å ta ansvar - dette svaret forklarer dine rettigheter i en slik situasjon."
-   
-   VIKTIG FOR RELEVANS-SCORING:
-   - Spørsmål som direkte besvarer "hva kan jeg gjøre nå?" = 9-10
-   - Spørsmål om frister, reklamasjon, og konkrete rettigheter = 8-9
-   - Spørsmål om vilkår som må være oppfylt = 7-8
-   - Generelle juridiske forklaringer = 5-6
-   - Bakgrunnsinformasjon og teoretiske spørsmål = 1-4
+   - "relevance": Tall 1-10 for hvor relevant dette er for brukerens spesifikke sak (10=avgjørende, 7+=viktig, <7=bakgrunn)
+   - "relevance_reason": Kort forklaring (1-2 setninger) på HVORFOR dette svaret er relevant for denne brukerens situasjon. Referer til konkrete detaljer fra faktum. Eksempel: "Siden du kjøpte varen for 3 uker siden, er reklamasjonsfristen spesielt viktig for din sak."
 
 2. "checklist": 5-8 konkrete handlinger brukeren bør gjøre, med:
    - "id": unik ID
@@ -367,13 +194,7 @@ VIKTIG:
 - Konfidensen skal reflektere hvor godt evidensen støtter svaret
 - Svarene skal være på norsk, i et enkelt språk
 - Sorter qa_items etter relevance (høyest først)
-
-KRAV TIL KILDER (citations):
-- Hvert svar MÅ ha minst 2 kilder, helst 3-4
-- Bruk ULIKE typer kilder når mulig: lovtekst + forarbeider, eller lovtekst + rettspraksis
-- Inkluder alltid spesifikk paragrafhenvisning når du siterer lov (f.eks. "Forbrukerkjøpsloven § 27")
-- Hvis du bare finner én kilde, sett confidence til "lav"
-- Flere kilder = høyere confidence`;
+- relevance_reason SKAL forklare hvorfor svaret er viktig for DENNE brukerens situasjon`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
