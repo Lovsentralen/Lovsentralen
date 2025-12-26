@@ -216,7 +216,7 @@ export async function generateClarifyingQuestions(
     ? `\nJURIDISK KONTEKST FRA SØKERESULTATER:\n${legalContext}\n\nBruk denne konteksten til å stille spørsmål som er spesifikt relevante for de juridiske reglene som gjelder.`
     : "";
 
-  const prompt = `Du skal generere oppklarende spørsmål for å bedre forstå brukerens juridiske situasjon.
+  const prompt = `Du skal vurdere om det trengs oppklarende spørsmål for å forstå brukerens juridiske situasjon.
 
 FAKTUM:
 ${faktum}
@@ -224,20 +224,32 @@ ${faktum}
 KATEGORI: ${category || "Ikke spesifisert"}
 ${contextSection}
 
-Generer nøyaktig 3 konkrete oppklarende spørsmål som vil hjelpe med å avgjøre brukerens rettigheter og plikter.
+VIKTIG REGEL: Still BARE spørsmål som er NØDVENDIGE for å dekke hull i faktum.
+- Hvis faktum allerede inneholder nok informasjon, still INGEN spørsmål (returner tom liste)
+- Hvis det mangler 1-2 kritiske opplysninger, still 1-2 spørsmål
+- Still MAKS 3 spørsmål, men ALDRI mer enn nødvendig
+- De fleste saker trenger bare 1-2 spørsmål, ikke 3
 
-${legalContext ? `Basert på den juridiske konteksten, fokuser på fakta som er AVGJØRENDE for å anvende de relevante reglene. For eksempel:
-- Hvis det er snakk om reklamasjon: spør om tidspunkt for kjøp og oppdagelse av mangel
-- Hvis det er snakk om oppsigelse: spør om ansettelsestid og om det var skriftlig
-- Hvis det er snakk om husleie: spør om type leieforhold og kontraktsvilkår` : `Fokuser på:
-- Tidslinje (når skjedde ting)
-- Parter (hvem er involvert)
-- Dokumentasjon (hva finnes av bevis)`}
+Spørsmål skal KUN stilles hvis svaret vil:
+- Endre hvilken lov som gjelder (forbruker vs næringsdrivende)
+- Påvirke om frister er overholdt (kjøpstidspunkt, reklamasjonstidspunkt)
+- Avgjøre om vilkår er oppfylt (skriftlig avtale, varsel gitt)
 
-Spørsmålene skal være enkle og konkrete, ikke juridisk-tekniske. Unngå generiske spørsmål - still spørsmål som faktisk vil påvirke det juridiske utfallet.
+${legalContext ? `Basert på den juridiske konteksten, fokuser på fakta som er AVGJØRENDE for å anvende de relevante reglene:
+- Reklamasjon: tidspunkt for kjøp og oppdagelse (KUN hvis ikke nevnt i faktum)
+- Oppsigelse: ansettelsestid og skriftlighet (KUN hvis ikke nevnt i faktum)
+- Husleie: type leieforhold (KUN hvis ikke nevnt i faktum)` : `Hvis noe mangler, fokuser på:
+- Tidslinje (når skjedde ting) - KUN hvis ikke allerede oppgitt
+- Parter (forbruker/næringsdrivende) - KUN hvis uklart
+- Dokumentasjon - KUN hvis avgjørende for saken`}
+
+Spørsmålene skal være enkle, konkrete, og direkte knyttet til et hull i faktum.
 
 Returner som JSON:
-{ "questions": ["Spørsmål 1", "Spørsmål 2", "Spørsmål 3"] }`;
+{ "questions": [] } // Tom liste hvis faktum er tilstrekkelig
+{ "questions": ["Spørsmål 1"] } // Ofte nok med 1 spørsmål
+{ "questions": ["Spørsmål 1", "Spørsmål 2"] } // Sjelden mer enn 2
+{ "questions": ["Spørsmål 1", "Spørsmål 2", "Spørsmål 3"] } // Bare hvis absolutt nødvendig`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -251,8 +263,9 @@ Returner som JSON:
 
   const content = response.choices[0]?.message?.content || '{"questions": []}';
   const parsed = JSON.parse(content);
-  // Ensure maximum of 3 questions
-  return (parsed.questions || []).slice(0, 3);
+  // Return only necessary questions (0-3), AI should already limit this
+  const questions = parsed.questions || [];
+  return questions.slice(0, 3);
 }
 
 export async function generateLegalAnalysis(
