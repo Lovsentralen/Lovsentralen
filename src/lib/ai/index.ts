@@ -294,7 +294,11 @@ Du skal returnere en JSON-struktur med følgende:
    - "id": unik ID (qa1, qa2, etc.)
    - "question": Et relevant spørsmål brukeren kan ha
    - "answer": Et grundig svar basert på evidensen
-   - "citations": Liste med {"source_name", "section", "url"} - HVER påstand må ha minst 1 kilde
+   - "citations": Liste med {"source_name", "section", "url"} - KRAV: Hvert svar SKAL ha MINST 2-4 kilder!
+     * Prioriter å finne flere ulike kilder som støtter svaret
+     * Bruk både lovtekst OG forarbeider/praksis når mulig
+     * Inkluder spesifikke paragrafhenvisninger (f.eks. "§ 27 første ledd")
+     * Jo flere relevante kilder, jo høyere confidence
    - "confidence": "lav", "middels", eller "høy"
    - "assumptions": Liste med antakelser som er gjort
    - "missing_facts": Hva som mangler for et bedre svar
@@ -334,7 +338,14 @@ VIKTIG:
 - Hvis noe ikke kan bekreftes av evidensen, si det eksplisitt
 - Konfidensen skal reflektere hvor godt evidensen støtter svaret
 - Svarene skal være på norsk, i et enkelt språk
-- Sorter qa_items etter relevance (høyest først)`;
+- Sorter qa_items etter relevance (høyest først)
+
+KRAV TIL KILDER (citations):
+- Hvert svar MÅ ha minst 2 kilder, helst 3-4
+- Bruk ULIKE typer kilder når mulig: lovtekst + forarbeider, eller lovtekst + rettspraksis
+- Inkluder alltid spesifikk paragrafhenvisning når du siterer lov (f.eks. "Forbrukerkjøpsloven § 27")
+- Hvis du bare finner én kilde, sett confidence til "lav"
+- Flere kilder = høyere confidence`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
