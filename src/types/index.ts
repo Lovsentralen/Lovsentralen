@@ -76,6 +76,7 @@ export interface QAItem {
   assumptions: string[];
   missing_facts: string[];
   relevance: number; // 1-10 score for how relevant this Q&A is to the user's specific case
+  relevance_reason: string; // Brief explanation of why this Q&A is relevant to the user's specific situation
 }
 
 export interface Citation {

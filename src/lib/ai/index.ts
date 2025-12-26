@@ -308,6 +308,11 @@ Du skal returnere en JSON-struktur med følgende:
      * 7 = Relevant og nyttig for brukeren å vite
      * 5-6 = Noe relevant, men mer generell informasjon
      * 1-4 = Lite relevant for denne spesifikke saken, bakgrunnsinformasjon
+   - "relevance_reason": En kort setning (maks 2 setninger) som forklarer HVORFOR dette spørsmålet er relevant for denne brukerens spesifikke situasjon. 
+     * Referer til konkrete detaljer fra brukerens faktum
+     * Forklar hvordan dette svaret hjelper brukeren
+     * Eksempel: "Siden du kjøpte varen for 3 uker siden, er reklamasjonsfristen spesielt viktig for din sak."
+     * Eksempel: "Du nevnte at selger nekter å ta ansvar - dette svaret forklarer dine rettigheter i en slik situasjon."
    
    VIKTIG FOR RELEVANS-SCORING:
    - Spørsmål som direkte besvarer "hva kan jeg gjøre nå?" = 9-10
